@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SafetyAndSecurityApp.Api.Data;
+using SafetyAndSecurityApp.Api.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +40,46 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+app.MapGet("/api/parkingviolations", async (AppDbContext db) =>
+{
+    var violations = await db.ParkingViolations
+        .OrderByDescending(v => v.DateIssued)
+        .ToListAsync();
+
+    return Results.Ok(violations);
+});
+
+app.MapPost("/api/parkingviolations", async (
+    ParkingViolation violation,
+    AppDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(violation.ViolationType))
+    {
+        return Results.BadRequest(new
+        {
+            message = "Violation type is required."
+        });
+    }
+
+    if (violation.FineAmount < 0)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Fine amount cannot be negative."
+        });
+    }
+
+    violation.Id = 0;
+    violation.DateIssued = DateTime.UtcNow;
+
+    db.ParkingViolations.Add(violation);
+    await db.SaveChangesAsync();
+
+    return Results.Created(
+        $"/api/parkingviolations/{violation.Id}",
+        violation);
+});
 
 app.Run();
 
