@@ -1,0 +1,26 @@
+# .NET build output
+**/bin/
+**/obj/
+
+# Node.js dependencies and build output
+**/node_modules/
+**/dist/
+
+# Local environment settings and secrets
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+
+# Local SQLite database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# IDE and operating system files
+.vscode/
+.vs/
+.DS_Store
+Thumbs.db
