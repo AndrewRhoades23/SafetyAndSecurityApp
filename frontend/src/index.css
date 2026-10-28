@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Instrument Sans', sans-serif;
+  --font-body: 'Work Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-surface-dark: #17151b;
+  --color-surface-dark-mid: #242129;
+  --color-surface-dark-light: #37313e;
+  --color-slate: #a49eae;
+  --color-panel: #f5f4f7;
+  --color-panel-alt: #eae7ee;
+  --color-primary: #5b2c83;
+  --color-primary-light: #c5a3e2;
+  --color-primary-soft: #eee5f6;
+  --color-ink: #19161d;
+  --color-ink-mid: #433d4b;
+  --color-ink-muted: #6c6575;
+  --color-on-dark-muted: #bdb6c6;
+  --color-rule: #d7d2dd;
+  --color-success: #563277;
+  --color-success-soft: #e8e0f0;
+  --color-warning: #70485c;
+  --color-warning-soft: #f3e9ef;
+  --color-info: #61318b;
+  --color-danger: #843d63;
+  --color-danger-soft: #f5eaf0;
+  --color-danger-rule: #ddc2d1;
+  --color-status-draft: #4b5563;
+  --color-status-draft-soft: #f0f1f3;
+  --color-status-issued: #9a460c;
+  --color-status-issued-soft: #fff0db;
+  --color-status-submitted: #166534;
+  --color-status-submitted-soft: #dcfce7;
+  --color-status-flagged: #991b1b;
+  --color-status-flagged-soft: #fee2e2;
+  --color-overlay: rgb(17 15 21 / 72%);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-surface-dark);
+  color: var(--color-panel);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+header, aside {
+  --color-ink-muted: var(--color-on-dark-muted);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
