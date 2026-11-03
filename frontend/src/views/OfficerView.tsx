@@ -1,5 +1,6 @@
 import { useState, useMemo, type Dispatch, type SetStateAction } from "react"
 import { VIOLATIONS, type Ticket, type TicketStatus } from "../data/tickets"
+import { searchVehicles, type Vehicle } from "../services/vehicleService"
 import TicketTable from "../components/TicketTable"
 import SearchBar from "../components/SearchBar"
 import StatusBadge from "../components/StatusBadge"
@@ -104,6 +105,9 @@ export default function OfficerView({ tickets, setTickets }: {
   const [myOnly, setMyOnly] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editError, setEditError] = useState("")
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState("");
+  const [vehicleMatches, setVehicleMatches] = useState<Vehicle[]>([]);
   const editingTicket = tickets.find((ticket) => ticket.id === editingId)
 
   // Form state
@@ -125,6 +129,69 @@ export default function OfficerView({ tickets, setTickets }: {
     setEditingId(null)
     setEditError("")
   }
+
+  
+
+async function lookupVehicle() {
+  const plate = form.plate.trim();
+
+  if (!plate) {
+    setLookupMessage("Enter a license plate first.");
+    return;
+  }
+
+  setLookupLoading(true);
+  setLookupMessage("");
+  setVehicleMatches([]);
+
+  try {
+    const matches = await searchVehicles(plate);
+
+    if (matches.length === 0) {
+      setForm((prev) => ({
+        ...prev,
+        studentId: "",
+        violatorName: "",
+        state: "",
+        make: "",
+        color: "",
+      }));
+
+      setLookupMessage(
+        "Vehicle not found. Please enter vehicle information manually."
+      );
+    } else if (matches.length === 1) {
+      fillVehicleDetails(matches[0]);
+      setLookupMessage("Vehicle found! Information autofilled.");
+    } else {
+      setVehicleMatches(matches);
+      setLookupMessage(
+        "Multiple vehicles found. Please select the correct registration."
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    setLookupMessage("Unable to search vehicles. Please try again.");
+  } finally {
+    setLookupLoading(false);
+  }
+}
+
+
+  function fillVehicleDetails(vehicle: Vehicle) {
+    setForm((prev) => ({
+      ...prev,
+      plate: vehicle.licensePlate,
+      state: vehicle.state,
+      studentId: vehicle.studentId,
+      violatorName: vehicle.violatorName,
+      make: `${vehicle.vehicleMake} ${vehicle.vehicleModel}`.trim(),
+      color: vehicle.vehicleColor,
+    }));
+
+    setVehicleMatches([]);
+  }
+
 
   function navigateTab(next: Tab) {
     if (editingId) resetForm()
@@ -519,7 +586,12 @@ export default function OfficerView({ tickets, setTickets }: {
                     aria-label="Student ID"
                     type="text"
                     value={form.studentId}
-                    onChange={(e) => setForm({ ...form, studentId: e.target.value })}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        studentId: e.target.value,
+                      }))
+                    }
                     placeholder="Enter student ID"
                     style={inputStyle}
                   />
@@ -548,9 +620,20 @@ export default function OfficerView({ tickets, setTickets }: {
                   <input
                     required={!editingId || editingTicket?.status !== "draft"}
                     value={form.plate}
-                    onChange={(e) =>
-                      setForm({ ...form, plate: e.target.value.toUpperCase() })
-                    }
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        plate: e.target.value.toUpperCase(),
+                        studentId: "",
+                        violatorName: "",
+                        state: "",
+                        make: "",
+                        color: "",
+                      }));
+
+                      setLookupMessage("");
+                      setVehicleMatches([]);
+                    }}
                     placeholder="e.g. ABC-1234"
                     style={{
                       ...inputStyle,
@@ -559,6 +642,50 @@ export default function OfficerView({ tickets, setTickets }: {
                       letterSpacing: "0.08em",
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={lookupVehicle}
+                    disabled={lookupLoading}
+                    style={{
+                      ...inputStyle,
+                      cursor: lookupLoading ? "wait" : "pointer",
+                      background: "var(--color-primary)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      marginTop: 6,
+                    }}
+                  >
+                    {lookupLoading ? "Searching..." : "Search Vehicle"}
+                  </button>
+                  {lookupMessage && (
+                    <p style={{ fontSize: 12, marginTop: 6 }}>
+                      {lookupMessage}
+                    </p>
+                  )}
+
+                  {vehicleMatches.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {vehicleMatches.map((vehicle) => (
+                        <button
+                          key={vehicle.id}
+                          type="button"
+                          onClick={() => {
+                            fillVehicleDetails(vehicle);
+                            setLookupMessage("Vehicle selected! Information autofilled.");
+                          }}
+                          style={{
+                            ...inputStyle,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {vehicle.licensePlate} ({vehicle.state}) —{" "}
+                          {vehicle.vehicleMake} {vehicle.vehicleModel}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </Field>
                 <Field label="STATE *">
                   <input

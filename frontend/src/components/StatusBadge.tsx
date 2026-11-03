@@ -1,4 +1,4 @@
-import type { TicketStatus } from "../data/tickets";
+import type { TicketStatus } from "../data/tickets.ts";
 
 const CONFIG: Record<TicketStatus, { label: string; bg: string; color: string }> = {
   draft:     { label: "DRAFT",     bg: "var(--color-status-draft-soft)", color: "var(--color-status-draft)" },

@@ -1,8 +1,9 @@
-import { useState } from "react";
-import OfficerView from "./views/OfficerView";
-import AdminView from "./views/AdminView";
-import SellsView from "./views/SellsView";
-import { SAMPLE_TICKETS, type Ticket } from "./data/tickets";
+import { useState, useEffect } from "react";
+import { getTickets } from "./services/ticketServices.ts";
+import OfficerView from "./views/OfficerView.tsx";
+import AdminView from "./views/AdminView.tsx";
+import SellsView from "./views/SellsView.tsx";
+import { SAMPLE_TICKETS, type Ticket } from "./data/tickets.ts";
 
 type Role = "officer" | "admin" | "sells";
 
@@ -15,6 +16,20 @@ const ROLES: { id: Role; label: string; sub: string }[] = [
 export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>(SAMPLE_TICKETS);
   const [role, setRole] = useState<Role>("officer");
+
+  useEffect(() => {
+    async function loadTickets() {
+      try {
+        const data = await getTickets();
+        setTickets(data);
+        console.log("Tickets loaded from API:", data);
+      } catch (error) {
+        console.error("Error loading tickets:", error);
+      }
+    }
+
+    loadTickets();
+  }, []);
 
   const current = ROLES.find((r) => r.id === role)!;
 

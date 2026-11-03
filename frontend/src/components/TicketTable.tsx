@@ -1,4 +1,4 @@
-import type { Ticket } from "../data/tickets";
+import type { Ticket } from "../data/tickets.ts";
 import StatusBadge from "./StatusBadge";
 
 interface Props {

@@ -4,15 +4,34 @@ using SafetyAndSecurityApp.Api.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UseCors("AllowReactFrontend");
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    await DbSeeder.SeedAsync(db);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -27,19 +46,35 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/api/vehicles/search", async (
+    string plate,
+    AppDbContext db) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    if (string.IsNullOrWhiteSpace(plate))
+    {
+        return Results.BadRequest(new
+        {
+            message = "License plate is required."
+        });
+    }
+
+    var normalizedPlate = plate.Trim().ToUpperInvariant();
+
+    var vehicles = await db.Vehicles
+        .Where(v => v.LicensePlate == normalizedPlate)
+        .ToListAsync();
+
+    return Results.Ok(vehicles);
+});
+
+app.MapGet("/api/violationtypes", async (AppDbContext db) =>
+{
+    var violationTypes = await db.ViolationTypes
+        .OrderBy(v => v.Name)
+        .ToListAsync();
+
+    return Results.Ok(violationTypes);
+});
 
 app.MapGet("/api/parkingviolations", async (AppDbContext db) =>
 {
