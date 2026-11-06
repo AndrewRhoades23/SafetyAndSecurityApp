@@ -1,6 +1,6 @@
 import type { Ticket } from "../data/tickets";
 
-const API_URL = "http://localhost:5000/api/parkingviolations";
+const API_URL = "http://localhost:5168/api/parkingviolations";
 
 interface ParkingViolationResponse {
   id: number;

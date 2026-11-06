@@ -1,10 +1,11 @@
-import { useState, useMemo, type Dispatch, type SetStateAction } from "react"
-import { VIOLATIONS, type Ticket, type TicketStatus } from "../data/tickets"
+import { useState, useMemo, useEffect, type Dispatch, type SetStateAction } from "react"
+import { type Ticket, type TicketStatus } from "../data/tickets"
 import { searchVehicles, type Vehicle } from "../services/vehicleService"
 import TicketTable from "../components/TicketTable"
 import SearchBar from "../components/SearchBar"
 import StatusBadge from "../components/StatusBadge"
 import Modal from "../components/Modal"
+import { getViolationTypes, type ViolationType } from "../services/violationtypeService"
 
 type Tab = "submit" | "tickets"
 type Sort = "newest" | "oldest" | "status"
@@ -109,6 +110,8 @@ export default function OfficerView({ tickets, setTickets }: {
   const [lookupMessage, setLookupMessage] = useState("");
   const [vehicleMatches, setVehicleMatches] = useState<Vehicle[]>([]);
   const editingTicket = tickets.find((ticket) => ticket.id === editingId)
+  const [violationTypes, setViolationTypes] = useState<ViolationType[]>([]);
+  const [violationTypesError, setViolationTypesError] = useState("");
 
   // Form state
   const [form, setForm] = useState({
@@ -116,7 +119,7 @@ export default function OfficerView({ tickets, setTickets }: {
     violatorName: "",
     plate: "",
     state: "CA",
-    violation: VIOLATIONS[0],
+    violation: "",
     location: "",
     fine: "",
     make: "",
@@ -124,8 +127,23 @@ export default function OfficerView({ tickets, setTickets }: {
     notes: "",
   })
 
+  useEffect(() => {
+  async function loadViolationTypes() {
+    try {
+      const types = await getViolationTypes();
+      setViolationTypes(types);
+      setViolationTypesError("");
+    } catch (error) {
+      console.error(error);
+      setViolationTypesError("Unable to load violation types.");
+    }
+  }
+
+  loadViolationTypes();
+}, []);
+
   function resetForm() {
-    setForm({ studentId: "", violatorName: "", plate: "", state: "CA", violation: VIOLATIONS[0], location: "", fine: "", make: "", color: "", notes: "" })
+    setForm({ studentId: "", violatorName: "", plate: "", state: "CA", violation: "", location: "", fine: "", make: "", color: "", notes: "" })
     setEditingId(null)
     setEditError("")
   }
@@ -736,15 +754,35 @@ async function lookupVehicle() {
                 <Field label="VIOLATION TYPE *">
                   <select
                     value={form.violation}
-                    onChange={(e) =>
-                      setForm({ ...form, violation: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const selectedType = violationTypes.find(
+                        (type) => type.name === e.target.value
+                      );
+
+                      setForm((prev) => ({
+                        ...prev,
+                        violation: e.target.value,
+                        fine: selectedType
+                          ? String(selectedType.defaultFine)
+                          : "",
+                      }));
+                    }}
                     style={inputStyle}
+                    disabled={violationTypes.length === 0}
                   >
-                    {VIOLATIONS.map((v) => (
-                      <option key={v}>{v}</option>
+                    <option value="">Select a violation</option>
+
+                    {violationTypes.map((type) => (
+                      <option key={type.id} value={type.name}>
+                        {type.name}
+                      </option>
                     ))}
                   </select>
+                  {violationTypesError && (
+                    <p role="alert" style={{ color: "red", fontSize: 12 }}>
+                      {violationTypesError}
+                    </p>
+                  )}
                 </Field>
               </div>
 
@@ -776,7 +814,12 @@ async function lookupVehicle() {
                     value={form.fine}
                     onChange={(e) => setForm({ ...form, fine: e.target.value })}
                     placeholder="0"
-                    style={{ ...inputStyle, fontFamily: "var(--font-mono)" }}
+                    style={{
+                      ...inputStyle,
+                      fontFamily: "var(--font-mono)",
+                      background: "var(--color-panel-alt)",
+                      cursor: "default",
+                    }}
                   />
                 </Field>
               </div>
