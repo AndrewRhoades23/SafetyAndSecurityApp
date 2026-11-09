@@ -6,6 +6,7 @@ import SearchBar from "../components/SearchBar"
 import StatusBadge from "../components/StatusBadge"
 import Modal from "../components/Modal"
 import { getViolationTypes, type ViolationType } from "../services/violationtypeService"
+import { createTicket } from "../services/ticketServices.ts";
 
 type Tab = "submit" | "tickets"
 type Sort = "newest" | "oldest" | "status"
@@ -112,6 +113,7 @@ export default function OfficerView({ tickets, setTickets }: {
   const editingTicket = tickets.find((ticket) => ticket.id === editingId)
   const [violationTypes, setViolationTypes] = useState<ViolationType[]>([]);
   const [violationTypesError, setViolationTypesError] = useState("");
+  const [savingTicket, setSavingTicket] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -236,7 +238,7 @@ async function lookupVehicle() {
     setTab("submit")
   }
 
-  function saveTicket(status: "draft" | "issued") {
+  async function saveTicket(status: "draft" | "issued") {
     const details = {
       studentId: form.studentId.trim(),
       violatorName: form.violatorName.trim(),
@@ -259,17 +261,60 @@ async function lookupVehicle() {
           ? { ...ticket, ...details }
           : ticket,
       ))
-    } else {
-      const ticket: Ticket = {
-        ...details,
-        id: `TKT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-        issuedAt: new Date().toISOString(),
-        officerId: OFFICER_ID,
-        officerName: "J. Martinez",
-        status,
-      }
-      setTickets((prev) => [ticket, ...prev])
-    }
+    
+} else if (status === "issued") {
+  if (savingTicket) return;
+
+  setSavingTicket(true);
+  setEditError("");
+
+  try {
+    const savedTicket = await createTicket({
+      studentId: form.studentId.trim(),
+      violatorName: form.violatorName.trim(),
+      licensePlate: form.plate.trim(),
+      state: form.state.trim(),
+      vehicleMake: form.make.trim(),
+      vehicleModel: "",
+      vehicleColor: form.color.trim(),
+      violationType: form.violation,
+      location: form.location.trim(),
+      fineAmount: Number(form.fine),
+      notes: form.notes.trim(),
+      officerId: OFFICER_ID,
+      officerName: "J. Martinez",
+    });
+
+    setTickets((prev) => [savedTicket, ...prev]);
+
+    resetForm();
+    setTab("tickets");
+  } catch (error) {
+    console.error(error);
+
+    setEditError(
+      error instanceof Error
+        ? error.message
+        : "Unable to save ticket."
+    );
+  } finally {
+    setSavingTicket(false);
+  }
+
+  return;
+  } else {
+    // Keep draft tickets in local state for now.
+    const ticket: Ticket = {
+      ...details,
+      id: `TKT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      issuedAt: new Date().toISOString(),
+      officerId: OFFICER_ID,
+      officerName: "J. Martinez",
+      status,
+    };
+
+    setTickets((prev) => [ticket, ...prev]);
+  }
     resetForm()
     setTab("tickets")
   }
@@ -840,7 +885,7 @@ async function lookupVehicle() {
 
               {editError && <p role="alert" className="text-warning text-sm mb-3">{editError}</p>}
               <div style={{ display: "flex", gap: 10 }}>
-                <button type="submit"
+                <button type="submit" disabled={savingTicket}
                   style={{
                     fontFamily: "var(--font-display)",
                     fontWeight: 600,
@@ -856,7 +901,11 @@ async function lookupVehicle() {
                   onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
                   onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
                 >
-                  {editingId ? "Save Changes" : "Issue Ticket"}
+                  {savingTicket
+                    ? "Saving..."
+                    : editingId
+                      ? "Save Changes"
+                      : "Issue Ticket"}
                 </button>
                 <button type="button" onClick={() => {
                   if (editingId) { resetForm(); setTab("tickets") }

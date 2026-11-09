@@ -85,36 +85,69 @@ app.MapGet("/api/parkingviolations", async (AppDbContext db) =>
     return Results.Ok(violations);
 });
 
+
 app.MapPost("/api/parkingviolations", async (
     ParkingViolation violation,
     AppDbContext db) =>
 {
+    if (string.IsNullOrWhiteSpace(violation.LicensePlate))
+        return Results.BadRequest(new
+        {
+            message = "License plate is required."
+        });
+
+    if (string.IsNullOrWhiteSpace(violation.State))
+        return Results.BadRequest(new
+        {
+            message = "License plate state is required."
+        });
+
     if (string.IsNullOrWhiteSpace(violation.ViolationType))
-    {
         return Results.BadRequest(new
         {
             message = "Violation type is required."
         });
-    }
+
+    if (string.IsNullOrWhiteSpace(violation.Location))
+        return Results.BadRequest(new
+        {
+            message = "Location is required."
+        });
 
     if (violation.FineAmount < 0)
-    {
         return Results.BadRequest(new
         {
             message = "Fine amount cannot be negative."
         });
-    }
 
+    var violationType = await db.ViolationTypes
+        .FirstOrDefaultAsync(v => v.Name == violation.ViolationType);
+
+    if (violationType == null)
+        return Results.BadRequest(new
+        {
+            message = "Invalid violation type."
+        });
+
+    // Use the configured violation type, but preserve
+    // the fine amount entered by the officer.
+    violation.ViolationTypeId = violationType.Id;
+
+    // Prevent clients from choosing the database ID
+    // or the official issuance timestamp.
     violation.Id = 0;
     violation.DateIssued = DateTime.UtcNow;
+    violation.Status = "issued";
 
     db.ParkingViolations.Add(violation);
     await db.SaveChangesAsync();
 
     return Results.Created(
         $"/api/parkingviolations/{violation.Id}",
-        violation);
+        violation
+    );
 });
+
 
 app.Run();
 
