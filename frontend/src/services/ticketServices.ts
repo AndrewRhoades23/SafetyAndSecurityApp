@@ -37,6 +37,7 @@ export interface CreateTicketRequest {
   notes: string;
   officerId: string;
   officerName: string;
+  status: "draft" | "issued";
 }
 
 function mapTicket(violation: ParkingViolationResponse): Ticket {

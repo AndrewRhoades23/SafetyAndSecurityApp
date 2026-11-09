@@ -238,51 +238,63 @@ async function lookupVehicle() {
     setTab("submit")
   }
 
-  async function saveTicket(status: "draft" | "issued") {
-    const details = {
-      studentId: form.studentId.trim(),
-      violatorName: form.violatorName.trim(),
-      plate: form.plate.trim(),
-      state: form.state.trim(),
-      violation: form.violation,
-      location: form.location.trim(),
-      fine: Number(form.fine),
-      vehicleMake: form.make.trim(),
-      vehicleColor: form.color.trim(),
-      notes: form.notes.trim(),
+async function saveTicket(status: "draft" | "issued") {
+  const details = {
+    studentId: form.studentId.trim(),
+    violatorName: form.violatorName.trim(),
+    plate: form.plate.trim(),
+    state: form.state.trim(),
+    violation: form.violation,
+    location: form.location.trim(),
+    fine: Number(form.fine),
+    vehicleMake: form.make.trim(),
+    vehicleColor: form.color.trim(),
+    notes: form.notes.trim(),
+  };
+
+  // Existing tickets are still edited locally for now.
+  if (editingId) {
+    if (!editingTicket || !canEditTicket(editingTicket)) {
+      setEditError("This ticket is no longer available for you to edit.");
+      return;
     }
-    if (editingId) {
-      if (!editingTicket || !canEditTicket(editingTicket)) {
-        setEditError("This ticket is no longer available for you to edit.")
-        return
-      }
-      setTickets((prev) => prev.map((ticket) =>
+
+    setTickets((prev) =>
+      prev.map((ticket) =>
         ticket.id === editingId && canEditTicket(ticket)
           ? { ...ticket, ...details }
-          : ticket,
-      ))
-    
-} else if (status === "issued") {
+          : ticket
+      )
+    );
+
+    resetForm();
+    setTab("tickets");
+    return;
+  }
+
+  // Prevent duplicate submissions.
   if (savingTicket) return;
 
   setSavingTicket(true);
   setEditError("");
 
   try {
+    // Save drafts and issued tickets to SQLite.
     const savedTicket = await createTicket({
-      studentId: form.studentId.trim(),
-      violatorName: form.violatorName.trim(),
-      licensePlate: form.plate.trim(),
-      state: form.state.trim(),
-      vehicleMake: form.make.trim(),
+      studentId: details.studentId,
+      violatorName: details.violatorName,
+      licensePlate: details.plate,
+      state: details.state,
+      vehicleMake: details.vehicleMake,
       vehicleModel: "",
-      vehicleColor: form.color.trim(),
-      violationType: form.violation,
-      location: form.location.trim(),
-      fineAmount: Number(form.fine),
-      notes: form.notes.trim(),
+      vehicleColor: details.vehicleColor,
+      violationType: details.violation,
+      location: details.location,
+      fineAmount: details.fine,
+      notes: details.notes,
       officerId: OFFICER_ID,
       officerName: "J. Martinez",
+      status,
     });
 
     setTickets((prev) => [savedTicket, ...prev]);
@@ -300,24 +312,8 @@ async function lookupVehicle() {
   } finally {
     setSavingTicket(false);
   }
+}
 
-  return;
-  } else {
-    // Keep draft tickets in local state for now.
-    const ticket: Ticket = {
-      ...details,
-      id: `TKT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-      issuedAt: new Date().toISOString(),
-      officerId: OFFICER_ID,
-      officerName: "J. Martinez",
-      status,
-    };
-
-    setTickets((prev) => [ticket, ...prev]);
-  }
-    resetForm()
-    setTab("tickets")
-  }
 
   const filtered = useMemo(() => {
     let list = tickets.filter((t) =>
@@ -907,10 +903,17 @@ async function lookupVehicle() {
                       ? "Save Changes"
                       : "Issue Ticket"}
                 </button>
-                <button type="button" onClick={() => {
-                  if (editingId) { resetForm(); setTab("tickets") }
-                  else saveTicket("draft")
-                }}
+                <button
+                  type="button"
+                  disabled={savingTicket}
+                  onClick={() => {
+                    if (editingId) {
+                      resetForm();
+                      setTab("tickets");
+                    } else {
+                      saveTicket("draft");
+                    }
+                  }}
                   style={{
                     fontFamily: "var(--font-display)",
                     fontWeight: 500,
@@ -923,7 +926,7 @@ async function lookupVehicle() {
                     cursor: "pointer",
                   }}
                 >
-                  {editingId ? "Cancel" : "Save Draft"}
+                  {editingId ? "Cancel" : savingTicket ? "Saving..." : "Save Draft"}
                 </button>
               </div>
             </form>

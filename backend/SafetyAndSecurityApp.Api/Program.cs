@@ -90,55 +90,77 @@ app.MapPost("/api/parkingviolations", async (
     ParkingViolation violation,
     AppDbContext db) =>
 {
-    if (string.IsNullOrWhiteSpace(violation.LicensePlate))
+    // Make sure the ticket has a valid status.
+    if (violation.Status != "draft" &&
+        violation.Status != "issued")
+    {
         return Results.BadRequest(new
         {
-            message = "License plate is required."
+            message = "Invalid ticket status."
         });
+    }
 
-    if (string.IsNullOrWhiteSpace(violation.State))
-        return Results.BadRequest(new
-        {
-            message = "License plate state is required."
-        });
+    // Only require completed information when issuing a ticket.
+    // Drafts can be saved with missing information.
+    if (violation.Status == "issued")
+    {
+        if (string.IsNullOrWhiteSpace(violation.LicensePlate))
+            return Results.BadRequest(new
+            {
+                message = "License plate is required."
+            });
 
-    if (string.IsNullOrWhiteSpace(violation.ViolationType))
-        return Results.BadRequest(new
-        {
-            message = "Violation type is required."
-        });
+        if (string.IsNullOrWhiteSpace(violation.State))
+            return Results.BadRequest(new
+            {
+                message = "License plate state is required."
+            });
 
-    if (string.IsNullOrWhiteSpace(violation.Location))
-        return Results.BadRequest(new
-        {
-            message = "Location is required."
-        });
+        if (string.IsNullOrWhiteSpace(violation.ViolationType))
+            return Results.BadRequest(new
+            {
+                message = "Violation type is required."
+            });
 
+        if (string.IsNullOrWhiteSpace(violation.Location))
+            return Results.BadRequest(new
+            {
+                message = "Location is required."
+            });
+    }
+
+    // Fine amounts cannot be negative, even for drafts.
     if (violation.FineAmount < 0)
         return Results.BadRequest(new
         {
             message = "Fine amount cannot be negative."
         });
 
-    var violationType = await db.ViolationTypes
-        .FirstOrDefaultAsync(v => v.Name == violation.ViolationType);
+    // If a violation type was selected, find it in the database.
+    if (!string.IsNullOrWhiteSpace(violation.ViolationType))
+    {
+        var violationType = await db.ViolationTypes
+            .FirstOrDefaultAsync(v => v.Name == violation.ViolationType);
 
-    if (violationType == null)
-        return Results.BadRequest(new
-        {
-            message = "Invalid violation type."
-        });
+        if (violationType == null)
+            return Results.BadRequest(new
+            {
+                message = "Invalid violation type."
+            });
 
-    // Use the configured violation type, but preserve
-    // the fine amount entered by the officer.
-    violation.ViolationTypeId = violationType.Id;
+        violation.ViolationTypeId = violationType.Id;
+    }
+    else
+    {
+        // Drafts may not have a violation type selected yet.
+        violation.ViolationTypeId = null;
+    }
 
-    // Prevent clients from choosing the database ID
-    // or the official issuance timestamp.
+    // Assign the database ID and timestamp.
     violation.Id = 0;
     violation.DateIssued = DateTime.UtcNow;
-    violation.Status = "issued";
 
+    // Save the ticket to SQLite.
     db.ParkingViolations.Add(violation);
     await db.SaveChangesAsync();
 
@@ -147,6 +169,7 @@ app.MapPost("/api/parkingviolations", async (
         violation
     );
 });
+
 
 
 app.Run();
