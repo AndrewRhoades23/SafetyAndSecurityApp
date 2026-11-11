@@ -1,16 +1,57 @@
+
 import type { TicketStatus } from "../data/tickets.ts";
 
-const CONFIG: Record<TicketStatus, { label: string; bg: string; color: string }> = {
-  draft:     { label: "DRAFT",     bg: "var(--color-status-draft-soft)", color: "var(--color-status-draft)" },
-  issued:    { label: "PENDING REVIEW", bg: "var(--color-status-issued-soft)", color: "var(--color-status-issued)" },
-  submitted: { label: "SUBMITTED", bg: "var(--color-status-submitted-soft)", color: "var(--color-status-submitted)" },
-  flagged:   { label: "FLAGGED",   bg: "var(--color-status-flagged-soft)", color: "var(--color-status-flagged)" },
-  appealed:  { label: "APPEALED",  bg: "var(--color-primary-soft)", color: "var(--color-primary)" },
-  resolved:  { label: "RESOLVED",  bg: "var(--color-panel-alt)", color: "var(--color-ink-mid)" },
+const CONFIG: Record<
+  TicketStatus,
+  { label: string; bg: string; color: string }
+> = {
+  draft: {
+    label: "DRAFT",
+    bg: "var(--color-status-draft-soft)",
+    color: "var(--color-status-draft)",
+  },
+  issued: {
+    label: "PENDING REVIEW",
+    bg: "var(--color-status-issued-soft)",
+    color: "var(--color-status-issued)",
+  },
+  submitted: {
+    label: "SUBMITTED",
+    bg: "var(--color-status-submitted-soft)",
+    color: "var(--color-status-submitted)",
+  },
+  flagged: {
+    label: "FLAGGED",
+    bg: "var(--color-status-flagged-soft)",
+    color: "var(--color-status-flagged)",
+  },
+  appealed: {
+    label: "APPEALED",
+    bg: "var(--color-primary-soft)",
+    color: "var(--color-primary)",
+  },
+  resolved: {
+    label: "RESOLVED",
+    bg: "var(--color-panel-alt)",
+    color: "var(--color-ink-mid)",
+  },
 };
 
-export default function StatusBadge({ status }: { status: TicketStatus }) {
-  const c = CONFIG[status];
+export default function StatusBadge({
+  status,
+}: {
+  status: TicketStatus;
+}) {
+  const c = CONFIG[status] ?? {
+    label: "UNKNOWN",
+    bg: "var(--color-panel-alt)",
+    color: "var(--color-ink-mid)",
+  };
+
+  if (!CONFIG[status]) {
+    console.warn("Unexpected ticket status:", status);
+  }
+
   return (
     <span
       className="inline-block whitespace-nowrap shrink-0"

@@ -171,6 +171,111 @@ app.MapPost("/api/parkingviolations", async (
 });
 
 
+app.MapPut("/api/parkingviolations/{id:int}", async (
+    int id,
+    ParkingViolation updatedViolation,
+    AppDbContext db) =>
+{
+    // Find the existing ticket in SQLite.
+    var existingViolation = await db.ParkingViolations
+        .FindAsync(id);
+
+    if (existingViolation == null)
+    {
+        return Results.NotFound(new
+        {
+            message = "Ticket not found."
+        });
+    }
+
+    // Only allow tickets in these statuses to be edited.
+    if (existingViolation.Status != "draft" &&
+        existingViolation.Status != "issued" &&
+        existingViolation.Status != "flagged")
+    {
+        return Results.BadRequest(new
+        {
+            message = "This ticket cannot be edited."
+        });
+    }
+
+    // Require complete information for issued or flagged tickets.
+    if (existingViolation.Status != "draft")
+    {
+        if (string.IsNullOrWhiteSpace(updatedViolation.LicensePlate))
+            return Results.BadRequest(new
+            {
+                message = "License plate is required."
+            });
+
+        if (string.IsNullOrWhiteSpace(updatedViolation.State))
+            return Results.BadRequest(new
+            {
+                message = "License plate state is required."
+            });
+
+        if (string.IsNullOrWhiteSpace(updatedViolation.ViolationType))
+            return Results.BadRequest(new
+            {
+                message = "Violation type is required."
+            });
+
+        if (string.IsNullOrWhiteSpace(updatedViolation.Location))
+            return Results.BadRequest(new
+            {
+                message = "Location is required."
+            });
+    }
+
+    if (updatedViolation.FineAmount < 0)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Fine amount cannot be negative."
+        });
+    }
+
+    // Look up the selected violation type.
+    if (!string.IsNullOrWhiteSpace(updatedViolation.ViolationType))
+    {
+        var violationType = await db.ViolationTypes
+            .FirstOrDefaultAsync(v =>
+                v.Name == updatedViolation.ViolationType);
+
+        if (violationType == null)
+        {
+            return Results.BadRequest(new
+            {
+                message = "Invalid violation type."
+            });
+        }
+
+        existingViolation.ViolationTypeId = violationType.Id;
+    }
+    else
+    {
+        existingViolation.ViolationTypeId = null;
+    }
+
+    // Update the ticket's editable fields.
+    existingViolation.StudentId = updatedViolation.StudentId;
+    existingViolation.ViolatorName = updatedViolation.ViolatorName;
+    existingViolation.LicensePlate = updatedViolation.LicensePlate;
+    existingViolation.State = updatedViolation.State;
+    existingViolation.VehicleMake = updatedViolation.VehicleMake;
+    existingViolation.VehicleModel = updatedViolation.VehicleModel;
+    existingViolation.VehicleColor = updatedViolation.VehicleColor;
+    existingViolation.ViolationType = updatedViolation.ViolationType;
+    existingViolation.Location = updatedViolation.Location;
+    existingViolation.FineAmount = updatedViolation.FineAmount;
+    existingViolation.Notes = updatedViolation.Notes;
+
+    // Preserve the original ticket ID, officer, date, and status.
+    await db.SaveChangesAsync();
+
+    return Results.Ok(existingViolation);
+});
+
 
 app.Run();
 

@@ -98,3 +98,30 @@ export async function createTicket(
 
   return mapTicket(savedTicket);
 }
+
+
+export async function updateTicket(
+  id: string,
+  ticket: CreateTicketRequest
+): Promise<Ticket> {
+  const response = await fetch(`${API_URL}/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(ticket),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+
+    throw new Error(
+      error?.message ?? "Failed to update parking ticket."
+    );
+  }
+
+  const updatedTicket: ParkingViolationResponse =
+    await response.json();
+
+  return mapTicket(updatedTicket);
+}

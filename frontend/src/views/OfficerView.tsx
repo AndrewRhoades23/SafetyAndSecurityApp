@@ -6,7 +6,7 @@ import SearchBar from "../components/SearchBar"
 import StatusBadge from "../components/StatusBadge"
 import Modal from "../components/Modal"
 import { getViolationTypes, type ViolationType } from "../services/violationtypeService"
-import { createTicket } from "../services/ticketServices.ts";
+import { createTicket, updateTicket } from "../services/ticketServices.ts";
 
 type Tab = "submit" | "tickets"
 type Sort = "newest" | "oldest" | "status"
@@ -253,24 +253,60 @@ async function saveTicket(status: "draft" | "issued") {
   };
 
   // Existing tickets are still edited locally for now.
-  if (editingId) {
-    if (!editingTicket || !canEditTicket(editingTicket)) {
-      setEditError("This ticket is no longer available for you to edit.");
-      return;
-    }
+  
+if (editingId) {
+  if (!editingTicket || !canEditTicket(editingTicket)) {
+    setEditError("This ticket is no longer available for you to edit.");
+    return;
+  }
 
+  if (savingTicket) return;
+
+  setSavingTicket(true);
+  setEditError("");
+
+  try {
+    const updatedTicket = await updateTicket(editingId, {
+      studentId: details.studentId,
+      violatorName: details.violatorName,
+      licensePlate: details.plate,
+      state: details.state,
+      vehicleMake: details.vehicleMake,
+      vehicleModel: "",
+      vehicleColor: details.vehicleColor,
+      violationType: details.violation,
+      location: details.location,
+      fineAmount: details.fine,
+      notes: details.notes,
+      officerId: editingTicket.officerId,
+      officerName: editingTicket.officerName,
+      status: editingTicket.status === "draft" ? "draft" : "issued",
+    });
+
+    // Replace the existing ticket in React state.
     setTickets((prev) =>
       prev.map((ticket) =>
-        ticket.id === editingId && canEditTicket(ticket)
-          ? { ...ticket, ...details }
-          : ticket
+        ticket.id === editingId ? updatedTicket : ticket
       )
     );
 
     resetForm();
     setTab("tickets");
-    return;
+  } catch (error) {
+    console.error(error);
+
+    setEditError(
+      error instanceof Error
+        ? error.message
+        : "Unable to update ticket."
+    );
+  } finally {
+    setSavingTicket(false);
   }
+
+  return;
+}
+
 
   // Prevent duplicate submissions.
   if (savingTicket) return;
