@@ -1,6 +1,5 @@
-import { useState, useMemo, type Dispatch, type SetStateAction } from "react"
+import { useState, useMemo, useEffect, type Dispatch, type SetStateAction } from "react"
 import {
-  VIOLATIONS,
   type Ticket,
   type TicketStatus,
 } from "../data/tickets"
@@ -8,6 +7,14 @@ import TicketTable from "../components/TicketTable"
 import SearchBar from "../components/SearchBar"
 import StatusBadge from "../components/StatusBadge"
 import Modal from "../components/Modal"
+import { createTicket } from "../services/ticketServices.ts"
+import { searchVehicles, type Vehicle } from "../services/vehicleService"
+
+type ViolationType = {
+  id: number;
+  name: string;
+  defaultFine: number;
+};
 
 type Tab = "submit" | "all" | "review"
 
@@ -124,7 +131,11 @@ export default function AdminView({ tickets, setTickets }: {
   tickets: Ticket[]
   setTickets: Dispatch<SetStateAction<Ticket[]>>
 }) {
+  const [violationTypes, setViolationTypes] = useState<ViolationType[]>([]);
+  const [violationTypesError, setViolationTypesError] = useState("");
   const [tab, setTab] = useState<Tab>("all")
+  const [savingTicket, setSavingTicket] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<"newest" | "oldest">("newest")
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all")
@@ -132,13 +143,16 @@ export default function AdminView({ tickets, setTickets }: {
   const [reviewing, setReviewing] = useState<Ticket | null>(null)
   const [flagging, setFlagging] = useState<Ticket | null>(null)
   const [flagNotes, setFlagNotes] = useState("")
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState("");
+  const [vehicleMatches, setVehicleMatches] = useState<Vehicle[]>([]);
 
   const [form, setForm] = useState({
     studentId: "",
     violatorName: "",
     plate: "",
     state: "CA",
-    violation: VIOLATIONS[0],
+    violation: "",
     location: "",
     fine: "",
     make: "",
@@ -147,29 +161,164 @@ export default function AdminView({ tickets, setTickets }: {
     officerId: "ADM-001",
   })
 
-  function saveTicket(status: "draft" | "issued") {
-    const officer = OFFICERS.find((o) => o.id === form.officerId)!
-    const ticket: Ticket = {
-      id: `TKT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+  useEffect(() => {
+  async function loadViolationTypes() {
+    try {
+      const response = await fetch("http://localhost:5168/api/violationtypes");
+
+      if (!response.ok) {
+        throw new Error("Failed to load violation types.");
+      }
+
+      const data: ViolationType[] = await response.json();
+      setViolationTypes(data);
+      setViolationTypesError("");
+
+      if (data.length > 0) {
+        setForm((prev) => {
+          if (prev.violation) return prev;
+
+          return {
+            ...prev,
+            violation: data[0].name,
+            fine: String(data[0].defaultFine),
+          };
+        });
+      }
+    } catch (error) {
+      console.error("Error loading violation types:", error);
+      setViolationTypesError("Unable to load violation types.");
+    }
+  }
+
+  loadViolationTypes();
+}, []);
+
+  
+async function saveTicket(status: "draft" | "issued") {
+  if (savingTicket) return;
+
+  const officer = OFFICERS.find(
+    (o) => o.id === form.officerId
+  );
+
+  if (!officer) {
+    setSaveError("Please select a valid issuing officer.");
+    return;
+  }
+
+  setSavingTicket(true);
+  setSaveError("");
+
+  try {
+    const savedTicket = await createTicket({
       studentId: form.studentId.trim(),
       violatorName: form.violatorName.trim(),
-      plate: form.plate.trim(),
+      licensePlate: form.plate.trim(),
       state: form.state.trim(),
-      violation: form.violation,
-      location: form.location.trim(),
-      fine: Number(form.fine),
       vehicleMake: form.make.trim(),
+      vehicleModel: "",
       vehicleColor: form.color.trim(),
+      violationType: form.violation,
+      location: form.location.trim(),
+      fineAmount: Number(form.fine),
       notes: form.notes.trim(),
-      issuedAt: new Date().toISOString(),
       officerId: officer.id,
       officerName: officer.name,
       status,
-    }
-    setTickets((prev) => [ticket, ...prev])
-    setForm({ ...form, studentId: "", violatorName: "", plate: "", location: "", fine: "", make: "", color: "", notes: "" })
-    setTab("all")
+    });
+
+    setTickets((prev) => [savedTicket, ...prev]);
+
+    setForm((prev) => ({
+      ...prev,
+      studentId: "",
+      violatorName: "",
+      plate: "",
+      location: "",
+      fine: "",
+      make: "",
+      color: "",
+      notes: "",
+    }));
+
+    setLookupMessage("");
+  setVehicleMatches([]);
+
+    setTab("all");
+  } catch (error) {
+    console.error("Failed to save admin ticket:", error);
+
+    setSaveError(
+      error instanceof Error
+        ? error.message
+        : "Unable to save ticket."
+    );
+  } finally {
+    setSavingTicket(false);
   }
+}
+
+
+async function lookupVehicle() {
+  const plate = form.plate.trim();
+
+  if (!plate) {
+    setLookupMessage("Enter a license plate first.");
+    return;
+  }
+
+  setLookupLoading(true);
+  setLookupMessage("");
+  setVehicleMatches([]);
+
+  try {
+    const matches = await searchVehicles(plate);
+
+    if (matches.length === 0) {
+      setForm((prev) => ({
+        ...prev,
+        studentId: "",
+        violatorName: "",
+        state: "",
+        make: "",
+        color: "",
+      }));
+
+      setLookupMessage(
+        "Vehicle not found. Please enter vehicle information manually."
+      );
+    } else if (matches.length === 1) {
+      fillVehicleDetails(matches[0]);
+      setLookupMessage("Vehicle found! Information autofilled.");
+    } else {
+      setVehicleMatches(matches);
+      setLookupMessage(
+        "Multiple vehicles found. Please select the correct registration."
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    setLookupMessage("Unable to search vehicles. Please try again.");
+  } finally {
+    setLookupLoading(false);
+  }
+}
+
+function fillVehicleDetails(vehicle: Vehicle) {
+  setForm((prev) => ({
+    ...prev,
+    plate: vehicle.licensePlate,
+    state: vehicle.state,
+    studentId: vehicle.studentId,
+    violatorName: vehicle.violatorName,
+    make: `${vehicle.vehicleMake} ${vehicle.vehicleModel}`.trim(),
+    color: vehicle.vehicleColor,
+  }));
+
+  setVehicleMatches([]);
+}
+
 
   const activeTickets = useMemo(
     () => tickets.filter((ticket) => ticket.status !== "resolved"),
@@ -575,9 +724,20 @@ export default function AdminView({ tickets, setTickets }: {
                   <input
                     required
                     value={form.plate}
-                    onChange={(e) =>
-                      setForm({ ...form, plate: e.target.value.toUpperCase() })
-                    }
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        plate: e.target.value.toUpperCase(),
+                        studentId: "",
+                        violatorName: "",
+                        state: "",
+                        make: "",
+                        color: "",
+                      }));
+
+                      setLookupMessage("");
+                      setVehicleMatches([]);
+                    }}
                     placeholder="e.g. ABC-1234"
                     style={{
                       ...inputStyle,
@@ -586,7 +746,55 @@ export default function AdminView({ tickets, setTickets }: {
                       letterSpacing: "0.08em",
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={lookupVehicle}
+                    disabled={lookupLoading}
+                    style={{
+                      ...inputStyle,
+                      cursor: lookupLoading ? "wait" : "pointer",
+                      background: "var(--color-primary)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      marginTop: 6,
+                    }}
+                  >
+                    {lookupLoading ? "Searching..." : "Search Vehicle"}
+                  </button>
+
+                  {lookupMessage && (
+                    <p style={{ fontSize: 12, marginTop: 6, color: "var(--color-ink)", }}>
+                      {lookupMessage}
+                    </p>
+                  )}
+
+                  {vehicleMatches.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {vehicleMatches.map((vehicle) => (
+                        <button
+                          key={vehicle.id}
+                          type="button"
+                          onClick={() => {
+                            fillVehicleDetails(vehicle);
+                            setLookupMessage(
+                              "Vehicle selected! Information autofilled."
+                            );
+                          }}
+                          style={{
+                            ...inputStyle,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {vehicle.licensePlate} ({vehicle.state}) —{" "}
+                          {vehicle.vehicleMake} {vehicle.vehicleModel}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </Field>
+
                 <Field label="STATE *">
                   <input
                     required
@@ -634,16 +842,40 @@ export default function AdminView({ tickets, setTickets }: {
                 <Field label="VIOLATION TYPE *">
                   <select
                     value={form.violation}
-                    onChange={(e) =>
-                      setForm({ ...form, violation: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const selected = violationTypes.find(
+                        (v) => v.name === e.target.value
+                      );
+
+                      setForm((prev) => ({
+                        ...prev,
+                        violation: e.target.value,
+                        fine: selected
+                          ? String(selected.defaultFine)
+                          : prev.fine,
+                      }));
+                    }}
+                    disabled={violationTypes.length === 0}
                     style={inputStyle}
                   >
-                    {VIOLATIONS.map((v) => (
-                      <option key={v}>{v}</option>
+                    {violationTypes.length === 0 && (
+                      <option value="">No violations loaded</option>
+                    )}
+
+                    {violationTypes.map((v) => (
+                      <option key={v.id} value={v.name}>
+                        {v.name}
+                      </option>
                     ))}
                   </select>
+
+                  {violationTypesError && (
+                    <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+                      {violationTypesError}
+                    </p>
+                  )}
                 </Field>
+
               </div>
               <div
                 style={{
@@ -690,7 +922,7 @@ export default function AdminView({ tickets, setTickets }: {
                 </Field>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button type="submit"
+                <button type="submit" disabled={savingTicket}
                   style={{
                     fontFamily: "var(--font-display)",
                     fontWeight: 600,
@@ -703,9 +935,9 @@ export default function AdminView({ tickets, setTickets }: {
                     cursor: "pointer",
                   }}
                 >
-                  Issue Ticket
+                  {savingTicket ? "Saving..." : "Issue Ticket"}
                 </button>
-                <button type="button" onClick={() => saveTicket("draft")}
+                <button type="button" onClick={() => saveTicket("draft")} disabled={savingTicket}
                   style={{
                     fontFamily: "var(--font-display)",
                     fontWeight: 500,
@@ -721,6 +953,19 @@ export default function AdminView({ tickets, setTickets }: {
                   Save Draft
                 </button>
               </div>
+
+              {saveError && (
+                <p
+                  role="alert"
+                  style={{
+                    color: "#b91c1c",
+                    fontSize: 13,
+                    marginTop: 12,
+                  }}
+                >
+                  {saveError}
+                </p>
+              )}
             </form>
           )}
 
@@ -1117,8 +1362,10 @@ export default function AdminView({ tickets, setTickets }: {
             <Field label="VIOLATION TYPE">
               <select value={editing.violation}
                 onChange={(e) => setEditing({ ...editing, violation: e.target.value })} style={inputStyle}>
-                {VIOLATIONS.map((v) => (
-                  <option key={v}>{v}</option>
+                {violationTypes.map((v) => (
+                  <option key={v.id} value={v.name}>
+                    {v.name}
+                  </option>
                 ))}
               </select>
             </Field>

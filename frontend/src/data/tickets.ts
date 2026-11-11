@@ -23,7 +23,7 @@ export const VIOLATIONS = [
   "Parking in a Marked Fire Lane",
   "Double Parking",
   "Disabled Parking Violation",
-  "No (or impropely displayed) SBU Permit",
+  "No (or improperly displayed) SBU Permit",
   "Failure to stop at a stop sign",
   "Parked on grassy/non-striped area",
   "Parking on sidewalk, Pedestrian Crosswalk or No Parking Area",

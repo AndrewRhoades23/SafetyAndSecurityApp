@@ -752,8 +752,8 @@ if (editingId) {
                   >
                     {lookupLoading ? "Searching..." : "Search Vehicle"}
                   </button>
-                  {lookupMessage && (
-                    <p style={{ fontSize: 12, marginTop: 6 }}>
+                   {lookupMessage && (
+                    <p style={{ fontSize: 12, marginTop: 6, color: "var(--color-ink)", }}>
                       {lookupMessage}
                     </p>
                   )}
