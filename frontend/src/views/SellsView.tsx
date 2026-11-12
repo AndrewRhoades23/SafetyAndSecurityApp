@@ -69,6 +69,7 @@ export default function SellsView({ tickets, setTickets }: {
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmingTicket, setConfirmingTicket] = useState<Ticket | null>(null);
 
   const sellsTickets = useMemo(
     () => tickets.filter((ticket) => ticket.status === "submitted"),
@@ -218,7 +219,7 @@ export default function SellsView({ tickets, setTickets }: {
               actions={(ticket) => (
                 <button
                   type="button"
-                  onClick={() => markAsDone(ticket)}
+                  onClick={() => setConfirmingTicket(ticket)}
                   className="min-w-max whitespace-nowrap font-mono text-xs px-3 py-2 rounded bg-primary text-white cursor-pointer"
                 >
                   Mark as Done
@@ -273,10 +274,98 @@ export default function SellsView({ tickets, setTickets }: {
             </button>
             <button
               type="button"
-              onClick={() => markAsDone(selected)}
+              onClick={() => setConfirmingTicket(selected)}
               className="font-display font-semibold text-sm px-5 py-2 rounded bg-primary text-white cursor-pointer"
             >
               Mark as Done
+            </button>
+          </div>
+        </Modal>
+      )}
+      {confirmingTicket && (
+        <Modal
+          title="Confirm Ticket Processing"
+          onClose={() => setConfirmingTicket(null)}
+          width={460}
+        >
+          <p
+            style={{
+              fontSize: 14,
+              color: "var(--color-ink)",
+              lineHeight: 1.6,
+            }}
+          >
+            Are you sure you want to mark ticket{" "}
+            <strong>{confirmingTicket.id}</strong> as processed?
+          </p>
+
+          <div
+            style={{
+              background: "var(--color-panel-alt)",
+              padding: 14,
+              borderRadius: 5,
+              marginTop: 14,
+              color: "var(--color-ink)",
+              fontSize: 13,
+            }}
+          >
+            <div><strong>Student:</strong> {confirmingTicket.violatorName || "Not recorded"}</div>
+            <div><strong>Student ID:</strong> {confirmingTicket.studentId || "Not recorded"}</div>
+            <div><strong>License Plate:</strong> {confirmingTicket.plate}</div>
+            <div><strong>Fine:</strong> ${confirmingTicket.fine.toFixed(2)}</div>
+          </div>
+
+          <p
+            style={{
+              fontSize: 12,
+              color: "var(--color-ink-mid)",
+              marginTop: 14,
+            }}
+          >
+            Confirming will remove this ticket from the active Sells queue
+            and mark it as resolved.
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              marginTop: 20,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setConfirmingTicket(null)}
+              style={{
+                padding: "9px 18px",
+                border: "1px solid var(--color-rule)",
+                borderRadius: 5,
+                background: "#fff",
+                color: "var(--color-ink)",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                markAsDone(confirmingTicket);
+                setConfirmingTicket(null);
+              }}
+              style={{
+                padding: "9px 18px",
+                border: "none",
+                borderRadius: 5,
+                background: "var(--color-primary)",
+                color: "#fff",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Confirm — Mark as Done
             </button>
           </div>
         </Modal>

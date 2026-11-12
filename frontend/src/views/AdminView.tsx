@@ -344,14 +344,26 @@ function fillVehicleDetails(vehicle: Vehicle) {
   }, [search, sort, statusFilter, activeTickets])
 
   const pending = tickets.filter(
-    (t) => t.status === "issued" || t.status === "draft",
-  )
+    (t) => t.status === "issued"
+  );
 
   function submitToSells(t: Ticket) {
+    const currentTicket = tickets.find((x) => x.id === t.id);
+
+    if (!currentTicket || currentTicket.status !== "issued") {
+      setReviewing(null);
+      return;
+    }
+
     setTickets((prev) =>
-      prev.map((x) => (x.id === t.id ? { ...x, status: "submitted" } : x)),
-    )
-    setReviewing(null)
+      prev.map((x) =>
+        x.id === t.id && x.status === "issued"
+          ? { ...x, status: "submitted" }
+          : x
+      )
+    );
+
+    setReviewing(null);
   }
 
   function flagTicket(t: Ticket, notes: string) {
@@ -1123,9 +1135,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                           Flag
                         </button>
                       )}
-                      {(t.status === "issued" ||
-                        t.status === "draft" ||
-                        t.status === "flagged") && (
+                      {t.status === "issued" && (
                         <button
                           className="col-start-2 row-start-2"
                           onClick={() => setReviewing(t)}
@@ -1462,6 +1472,18 @@ function fillVehicleDetails(vehicle: Vehicle) {
               {reviewing.plate}
             </strong>
             ) to the Sells department for processing.
+          </p>
+          <p
+            style={{
+              fontSize: 12,
+              color: "var(--color-ink-mid)",
+              marginBottom: 16,
+              lineHeight: 1.6,
+            }}
+          >
+            Please verify the ticket information below before continuing.
+            Confirming will move this ticket from Pending Review to the
+            Sells processing queue.
           </p>
           <div
             style={{
