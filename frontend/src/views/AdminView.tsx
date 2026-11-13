@@ -444,6 +444,50 @@ function fillVehicleDetails(vehicle: Vehicle) {
     }
   }
 
+
+  async function unflagTicket(t: Ticket) {
+    if (savingTicket || t.status !== "flagged") return;
+
+    setSavingTicket(true);
+    setSaveError("");
+
+    try {
+      const updatedTicket = await updateTicket(t.id, {
+        studentId: t.studentId ?? "",
+        violatorName: t.violatorName ?? "",
+        licensePlate: t.plate,
+        state: t.state,
+        vehicleMake: t.vehicleMake ?? "",
+        vehicleModel: "",
+        vehicleColor: t.vehicleColor ?? "",
+        violationType: t.violation,
+        location: t.location,
+        fineAmount: t.fine,
+        notes: t.notes ?? "",
+        officerId: t.officerId,
+        officerName: t.officerName,
+        status: "issued",
+      });
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === t.id ? updatedTicket : ticket
+        )
+      );
+    } catch (error) {
+      console.error("Failed to unflag ticket:", error);
+
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Unable to unflag ticket."
+      );
+    } finally {
+      setSavingTicket(false);
+    }
+  }
+
+
   async function saveChanges(t: Ticket) {
     if (savingTicket) return;
 
@@ -1238,6 +1282,26 @@ function fillVehicleDetails(vehicle: Vehicle) {
                           }}
                         >
                           Flag
+                        </button>
+                      )}
+                      {t.status === "flagged" && (
+                        <button
+                          type="button"
+                          className="col-start-1 row-start-2"
+                          onClick={() => unflagTicket(t)}
+                          disabled={savingTicket}
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            padding: "3px 8px",
+                            borderRadius: 3,
+                            border: "1px solid var(--color-status-submitted)",
+                            background: "var(--color-status-submitted-soft)",
+                            color: "var(--color-status-submitted)",
+                            cursor: savingTicket ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          Unflag
                         </button>
                       )}
                       {t.status === "issued" && (

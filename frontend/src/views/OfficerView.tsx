@@ -280,7 +280,7 @@ if (editingId) {
       notes: details.notes,
       officerId: editingTicket.officerId,
       officerName: editingTicket.officerName,
-      status: editingTicket.status === "draft" ? "draft" : "issued",
+      status: editingTicket.status,
     });
 
     // Replace the existing ticket in React state.
