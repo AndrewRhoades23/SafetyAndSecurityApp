@@ -40,6 +40,11 @@ export interface CreateTicketRequest {
   status: "draft" | "issued";
 }
 
+export interface UpdateTicketRequest
+  extends Omit<CreateTicketRequest, "status"> {
+  status: TicketStatus;
+}
+
 function mapTicket(violation: ParkingViolationResponse): Ticket {
   return {
     id: String(violation.id),
@@ -102,7 +107,7 @@ export async function createTicket(
 
 export async function updateTicket(
   id: string,
-  ticket: CreateTicketRequest
+  ticket: UpdateTicketRequest
 ): Promise<Ticket> {
   const response = await fetch(`${API_URL}/${id}`, {
     method: "PUT",

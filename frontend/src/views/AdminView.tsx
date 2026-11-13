@@ -7,7 +7,7 @@ import TicketTable from "../components/TicketTable"
 import SearchBar from "../components/SearchBar"
 import StatusBadge from "../components/StatusBadge"
 import Modal from "../components/Modal"
-import { createTicket } from "../services/ticketServices.ts"
+import { createTicket, updateTicket } from "../services/ticketServices.ts"
 import { searchVehicles, type Vehicle } from "../services/vehicleService"
 
 type ViolationType = {
@@ -347,40 +347,145 @@ function fillVehicleDetails(vehicle: Vehicle) {
     (t) => t.status === "issued"
   );
 
-  function submitToSells(t: Ticket) {
+  async function submitToSells(t: Ticket) {
     const currentTicket = tickets.find((x) => x.id === t.id);
 
-    if (!currentTicket || currentTicket.status !== "issued") {
-      setReviewing(null);
+    if (!currentTicket || currentTicket.status !== "issued" || savingTicket) {
       return;
     }
 
-    setTickets((prev) =>
-      prev.map((x) =>
-        x.id === t.id && x.status === "issued"
-          ? { ...x, status: "submitted" }
-          : x
-      )
-    );
+    setSavingTicket(true);
+    setSaveError("");
 
-    setReviewing(null);
+    try {
+      const updatedTicket = await updateTicket(t.id, {
+        studentId: t.studentId ?? "",
+        violatorName: t.violatorName ?? "",
+        licensePlate: t.plate,
+        state: t.state,
+        vehicleMake: t.vehicleMake ?? "",
+        vehicleModel: "",
+        vehicleColor: t.vehicleColor ?? "",
+        violationType: t.violation,
+        location: t.location,
+        fineAmount: t.fine,
+        notes: t.notes ?? "",
+        officerId: t.officerId,
+        officerName: t.officerName,
+        status: "submitted",
+      });
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === t.id ? updatedTicket : ticket
+        )
+      );
+
+      setReviewing(null);
+    } catch (error) {
+      console.error("Failed to submit ticket:", error);
+
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit ticket."
+      );
+    } finally {
+      setSavingTicket(false);
+    }
   }
 
-  function flagTicket(t: Ticket, notes: string) {
-    setTickets((prev) =>
-      prev.map((x) =>
-        x.id === t.id
-          ? { ...x, status: "flagged", notes: notes || x.notes }
-          : x,
-      ),
-    )
-    setFlagging(null)
-    setFlagNotes("")
+  async function flagTicket(t: Ticket, notes: string) {
+    if (savingTicket || !notes.trim()) return;
+
+    setSavingTicket(true);
+    setSaveError("");
+
+    try {
+      const updatedTicket = await updateTicket(t.id, {
+        studentId: t.studentId ?? "",
+        violatorName: t.violatorName ?? "",
+        licensePlate: t.plate,
+        state: t.state,
+        vehicleMake: t.vehicleMake ?? "",
+        vehicleModel: "",
+        vehicleColor: t.vehicleColor ?? "",
+        violationType: t.violation,
+        location: t.location,
+        fineAmount: t.fine,
+        notes: notes.trim(),
+        officerId: t.officerId,
+        officerName: t.officerName,
+        status: "flagged",
+      });
+
+      console.log("Requested status: flagged");
+      console.log("Backend returned status:", updatedTicket.status);
+      console.log("Updated ticket:", updatedTicket);
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === t.id ? updatedTicket : ticket
+        )
+      );
+
+      setFlagging(null);
+      setFlagNotes("");
+    } catch (error) {
+      console.error("Failed to flag ticket:", error);
+
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Unable to flag ticket."
+      );
+    } finally {
+      setSavingTicket(false);
+    }
   }
 
-  function saveChanges(t: Ticket) {
-    setTickets((prev) => prev.map((x) => x.id === t.id ? t : x))
-    setEditing(null)
+  async function saveChanges(t: Ticket) {
+    if (savingTicket) return;
+
+    setSavingTicket(true);
+    setSaveError("");
+
+    try {
+      const updatedTicket = await updateTicket(t.id, {
+        studentId: t.studentId ?? "",
+        violatorName: t.violatorName ?? "",
+        licensePlate: t.plate,
+        state: t.state,
+        vehicleMake: t.vehicleMake ?? "",
+        vehicleModel: "",
+        vehicleColor: t.vehicleColor ?? "",
+        violationType: t.violation,
+        location: t.location,
+        fineAmount: t.fine,
+        notes: t.notes ?? "",
+        officerId: t.officerId,
+        officerName: t.officerName,
+        status: t.status,
+      });
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === t.id ? updatedTicket : ticket
+        )
+      );
+
+      setEditing(null);
+    } catch (error) {
+      console.error("Failed to update ticket:", error);
+
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Unable to update ticket."
+      );
+    } finally {
+      setSavingTicket(false);
+    }
   }
 
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -1434,9 +1539,8 @@ function fillVehicleDetails(vehicle: Vehicle) {
               Cancel
             </button>
             <button
-              onClick={() => {
-                saveChanges(editing)
-              }}
+              onClick={() => saveChanges(editing)}
+              disabled={savingTicket} 
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 600,
@@ -1449,7 +1553,12 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 cursor: "pointer",
               }}
             >
-              Save Changes
+              {savingTicket ? "Saving..." : "Save Changes"}
+              {saveError && (
+                <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+                  {saveError}
+                </p>
+              )}
             </button>
           </div>
         </Modal>
@@ -1545,6 +1654,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
             </button>
             <button
               onClick={() => submitToSells(reviewing)}
+              disabled={savingTicket}
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 600,
@@ -1557,7 +1667,12 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 cursor: "pointer",
               }}
             >
-              Confirm — Submit to Sells
+              {savingTicket ? "Submitting..." : "Confirm — Submit to Sells"}
+              {saveError && (
+                <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+                  {saveError}
+                </p>
+              )}
             </button>
           </div>
         </Modal>
@@ -1666,7 +1781,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
             </button>
             <button
               onClick={() => flagTicket(flagging, flagNotes)}
-              disabled={!flagNotes.trim()}
+              disabled={!flagNotes.trim() || savingTicket}
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 600,
@@ -1680,7 +1795,12 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 transition: "background 0.15s",
               }}
             >
-              Flag Ticket
+              {savingTicket ? "Saving..." : "Flag Ticket"}
+              {saveError && (
+                <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+                  {saveError}
+                </p>
+              )}
             </button>
           </div>
         </Modal>

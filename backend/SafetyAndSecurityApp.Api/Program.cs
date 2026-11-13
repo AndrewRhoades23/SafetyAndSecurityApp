@@ -188,10 +188,12 @@ app.MapPut("/api/parkingviolations/{id:int}", async (
         });
     }
 
-    // Only allow tickets in these statuses to be edited.
-    if (existingViolation.Status != "draft" &&
-        existingViolation.Status != "issued" &&
-        existingViolation.Status != "flagged")
+// Allow existing tickets to be updated,
+// including tickets submitted to Sells.
+if (existingViolation.Status != "draft" &&
+    existingViolation.Status != "issued" &&
+    existingViolation.Status != "flagged" &&
+    existingViolation.Status != "submitted")
     {
         return Results.BadRequest(new
         {
@@ -270,7 +272,29 @@ app.MapPut("/api/parkingviolations/{id:int}", async (
     existingViolation.FineAmount = updatedViolation.FineAmount;
     existingViolation.Notes = updatedViolation.Notes;
 
-    // Preserve the original ticket ID, officer, date, and status.
+    // Validate the requested status.
+    var allowedStatuses = new[]
+    {
+        "draft",
+        "issued",
+        "flagged",
+        "appealed",
+        "submitted",
+        "resolved"
+    };
+
+    if (!allowedStatuses.Contains(updatedViolation.Status))
+    {
+        return Results.BadRequest(new
+        {
+            message = "Invalid ticket status."
+        });
+    }
+
+    // Update the ticket status.
+    existingViolation.Status = updatedViolation.Status;
+
+    // Preserve the original ticket ID, officer, and date.
     await db.SaveChangesAsync();
 
     return Results.Ok(existingViolation);

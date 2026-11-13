@@ -4,6 +4,7 @@ import TicketTable from "../components/TicketTable";
 import SearchBar from "../components/SearchBar";
 import StatusBadge from "../components/StatusBadge";
 import Modal from "../components/Modal";
+import { updateTicket } from "../services/ticketServices";
 
 type DateRange = "all" | "today" | "week" | "month";
 
@@ -77,13 +78,38 @@ export default function SellsView({ tickets, setTickets }: {
   );
   const selected = sellsTickets.find((ticket) => ticket.id === selectedId);
 
-  function markAsDone(ticket: Ticket) {
-    setTickets((previous) => previous.map((item) =>
-      item.id === ticket.id && item.status === "submitted"
-        ? { ...item, status: "resolved" }
-        : item,
-    ));
-    setSelectedId(null);
+  async function markAsDone(ticket: Ticket) {
+    if (ticket.status !== "submitted") return;
+
+    try {
+      const updatedTicket = await updateTicket(ticket.id, {
+        studentId: ticket.studentId ?? "",
+        violatorName: ticket.violatorName ?? "",
+        licensePlate: ticket.plate,
+        state: ticket.state,
+        vehicleMake: ticket.vehicleMake ?? "",
+        vehicleModel: "",
+        vehicleColor: ticket.vehicleColor ?? "",
+        violationType: ticket.violation,
+        location: ticket.location,
+        fineAmount: ticket.fine,
+        notes: ticket.notes ?? "",
+        officerId: ticket.officerId,
+        officerName: ticket.officerName,
+        status: "resolved",
+      });
+
+      setTickets((previous) =>
+        previous.map((item) =>
+          item.id === ticket.id ? updatedTicket : item
+        )
+      );
+
+      setSelectedId(null);
+    } catch (error) {
+      console.error("Failed to resolve ticket:", error);
+      alert("Unable to mark ticket as done. Please try again.");
+    }
   }
 
   const filtered = useMemo(() => {
