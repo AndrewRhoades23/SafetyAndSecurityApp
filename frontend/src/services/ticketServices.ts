@@ -60,10 +60,8 @@ function mapTicket(violation: ParkingViolationResponse): Ticket {
     officerName: violation.officerName,
     status: violation.status as TicketStatus,
     notes: violation.notes,
-    vehicleMake: [
-      violation.vehicleMake,
-      violation.vehicleModel,
-    ].filter(Boolean).join(" "),
+    vehicleMake: violation.vehicleMake,
+    vehicleModel: violation.vehicleModel,
     vehicleColor: violation.vehicleColor,
   };
 }

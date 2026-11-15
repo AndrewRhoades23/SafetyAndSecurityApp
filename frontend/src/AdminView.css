@@ -1,0 +1,170 @@
+
+.admin-layout {
+  display: grid;
+  min-height: calc(100vh - 53px);
+  transition: grid-template-columns 0.2s ease;
+}
+
+.admin-sidebar {
+  background: var(--color-surface-dark-mid);
+  border-right: 1px solid var(--color-surface-dark-light);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.admin-content {
+  background: var(--color-panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Mobile layout */
+@media (max-width: 767px) {
+  .admin-layout {
+    display: block;
+    min-height: calc(100vh - 53px);
+  }
+
+  .admin-sidebar {
+    display: none;
+  }
+
+  .admin-content {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+
+/* Admin Issue Ticket form */
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.admin-plate-grid {
+  grid-template-columns: minmax(0, 1fr) 80px;
+}
+
+.admin-location-grid {
+  grid-template-columns: minmax(0, 1fr) 120px;
+}
+
+.admin-page-content {
+  padding: 24px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Mobile form layout */
+@media (max-width: 767px) {
+  .admin-form-grid,
+  .admin-plate-grid,
+  .admin-location-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-page-content {
+    padding: 16px;
+  }
+
+  .admin-form-grid input,
+  .admin-form-grid select,
+  .admin-form-grid textarea {
+    font-size: 16px;
+    min-height: 44px;
+  }
+}
+
+
+/* Desktop ticket table */
+.admin-desktop-tickets {
+  display: block;
+  overflow-x: auto;
+}
+
+/* Mobile ticket cards */
+.admin-mobile-tickets {
+  display: none;
+}
+
+/* Only use cards on narrow touch devices */
+@media (max-width: 767px) and (pointer: coarse) {
+  .admin-desktop-tickets {
+    display: none;
+  }
+
+  .admin-mobile-tickets {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+.admin-mobile-tickets details {
+  background: #fff;
+  color: var(--color-ink);
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.admin-mobile-tickets summary {
+  cursor: pointer;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-mobile-ticket-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.admin-mobile-ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-mobile-ticket-actions button {
+  padding: 10px 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+
+/* Edit Ticket modal fields */
+.admin-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 767px) {
+  .admin-edit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-edit-grid input,
+  .admin-edit-grid select,
+  .admin-edit-grid textarea {
+    font-size: 16px;
+    min-height: 44px;
+  }
+}

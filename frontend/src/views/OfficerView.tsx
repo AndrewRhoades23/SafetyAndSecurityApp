@@ -7,6 +7,7 @@ import StatusBadge from "../components/StatusBadge"
 import Modal from "../components/Modal"
 import { getViolationTypes, type ViolationType } from "../services/violationtypeService"
 import { createTicket, updateTicket } from "../services/ticketServices.ts";
+import "../OfficerView.css"
 
 type Tab = "submit" | "tickets"
 type Sort = "newest" | "oldest" | "status"
@@ -384,24 +385,13 @@ if (editingId) {
 
   return (
     <div
+      className="officer-layout"
       style={{
-        display: "grid",
-        gridTemplateColumns: sidebarOpen ? "220px 1fr" : "48px 1fr",
-        minHeight: "calc(100vh - 53px)",
-        transition: "grid-template-columns 0.2s ease",
+        gridTemplateColumns: sidebarOpen ? "220px minmax(0, 1fr)" : "48px minmax(0, 1fr)",
       }}
     >
       {/* Sidebar */}
-      <aside
-        style={{
-          background: "var(--color-surface-dark-mid)",
-          borderRight: "1px solid var(--color-surface-dark-light)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-        }}
-      >
+      <aside className="officer-sidebar">
         {/* Collapse toggle */}
         <button
           onClick={() => setSidebarOpen((v) => !v)}
@@ -573,13 +563,7 @@ if (editingId) {
       </aside>
 
       {/* Content */}
-      <div
-        style={{
-          background: "var(--color-panel)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+        <div className="officer-content">
         {/* Tab bar */}
         <div
           style={{
@@ -605,7 +589,7 @@ if (editingId) {
           />
         </div>
 
-        <div style={{ padding: 24, flex: 1 }}>
+        <div className="officer-page-content">
           {tab === "submit" && (
             <form style={{ maxWidth: 640 }} onSubmit={(e) => { e.preventDefault(); saveTicket("issued") }}>
               <div style={{ marginBottom: 24 }}>
@@ -680,7 +664,7 @@ if (editingId) {
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
+              <div className="officer-form-grid">
                 <Field label="STUDENT ID">
                   <input
                     aria-label="Student ID"
@@ -708,14 +692,7 @@ if (editingId) {
                 </Field>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 80px",
-                  gap: 14,
-                  marginBottom: 14,
-                }}
-              >
+              <div className="officer-form-grid officer-plate-grid">
                 <Field label="LICENSE PLATE *">
                   <input
                     required={!editingId || editingTicket?.status !== "draft"}
@@ -805,14 +782,7 @@ if (editingId) {
                 </Field>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 14,
-                  marginBottom: 14,
-                }}
-              >
+              <div className="officer-form-grid">
                 <Field label="VEHICLE MAKE">
                   <input
                     value={form.make}
@@ -877,14 +847,7 @@ if (editingId) {
                 </Field>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 120px",
-                  gap: 14,
-                  marginBottom: 14,
-                }}
-              >
+              <div className="officer-form-grid officer-location-grid">
                 <Field label="LOCATION *">
                   <input
                     required={!editingId || editingTicket?.status !== "draft"}
@@ -1087,14 +1050,7 @@ if (editingId) {
                 </div>
               </div>
 
-              <div
-                style={{
-                  background: "#fff",
-                  borderRadius: 6,
-                  border: "1px solid var(--color-rule)",
-                  overflow: "hidden",
-                }}
-              >
+              <div className="officer-desktop-tickets">
                 <TicketTable
                   tickets={filtered}
                   onSelect={setSelected}
@@ -1108,7 +1064,96 @@ if (editingId) {
                     </button>
                   ) : null}
                 />
+              </div>     
+              <div className="officer-mobile-tickets">
+                {filtered.length === 0 ? (
+                  <p>No tickets found.</p>
+                ) : (
+                  filtered.map((ticket) => (
+                    <details
+                      key={ticket.id}
+                      style={{
+                        background: "#fff",
+                        border: "1px solid var(--color-rule)",
+                        borderRadius: 6,
+                        padding: 14,
+                      }}
+                    >
+                      <summary
+                        style={{
+                          cursor: "pointer",
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 13,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Ticket #{ticket.id} — {ticket.plate}
+                      </summary>
+
+                      <div
+                        style={{
+                          marginTop: 14,
+                          display: "grid",
+                          gridTemplateColumns: "1fr",
+                          gap: 10,
+                          fontSize: 13,
+                        }}
+                      >
+                        {[
+                          ["Student ID", ticket.studentId],
+                          ["Violator Name", ticket.violatorName],
+                          ["License Plate State", ticket.state],
+                          ["Vehicle Make", ticket.vehicleMake],
+                          ["Vehicle Model", ticket.vehicleModel],
+                          ["Vehicle Color", ticket.vehicleColor],
+                          ["Violation", ticket.violation],
+                          ["Location", ticket.location],
+                          ["Fine", `$${ticket.fine.toFixed(2)}`],
+                          ["Date Issued", new Date(ticket.issuedAt).toLocaleString()],
+                          ["Officer", ticket.officerName],
+                          ["Officer ID", ticket.officerId],
+                          ["Status", ticket.status],
+                          ["Notes", ticket.notes],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                color: "var(--color-ink-mid)",
+                                marginBottom: 3,
+                              }}
+                            >
+                              {label}
+                            </div>
+                            <div>{value || "Not recorded"}</div>
+                          </div>
+                        ))}
+
+                        {canEditTicket(ticket) && (
+                          <button
+                            type="button"
+                            onClick={() => startEditing(ticket)}
+                            style={{
+                              padding: "12px 16px",
+                              background: "var(--color-primary)",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 5,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                              marginTop: 8,
+                            }}
+                          >
+                            Edit Ticket
+                          </button>
+                        )}
+                      </div>
+                    </details>
+                  ))
+                )}
               </div>
+
             </div>
           )}
         </div>

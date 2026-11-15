@@ -5,10 +5,11 @@ import {
 } from "../data/tickets"
 import TicketTable from "../components/TicketTable"
 import SearchBar from "../components/SearchBar"
-import StatusBadge from "../components/StatusBadge"
+/* import StatusBadge from "../components/StatusBadge" */
 import Modal from "../components/Modal"
 import { createTicket, updateTicket } from "../services/ticketServices.ts"
 import { searchVehicles, type Vehicle } from "../services/vehicleService"
+import "../AdminView.css"
 
 type ViolationType = {
   id: number;
@@ -16,7 +17,7 @@ type ViolationType = {
   defaultFine: number;
 };
 
-type Tab = "submit" | "all" | "review"
+type Tab = "submit" | "all"
 
 function NavBtn({
   id,
@@ -573,24 +574,15 @@ function fillVehicleDetails(vehicle: Vehicle) {
 
   return (
     <div
+      className="admin-layout"
       style={{
-        display: "grid",
-        gridTemplateColumns: sidebarOpen ? "220px 1fr" : "48px 1fr",
-        minHeight: "calc(100vh - 53px)",
-        transition: "grid-template-columns 0.2s ease",
+        gridTemplateColumns: sidebarOpen
+          ? "220px minmax(0, 1fr)"
+          : "48px minmax(0, 1fr)",
       }}
     >
       {/* Sidebar */}
-      <aside
-        style={{
-          background: "var(--color-surface-dark-mid)",
-          borderRight: "1px solid var(--color-surface-dark-light)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-        }}
-      >
+      <aside className="admin-sidebar">
         {collapseBtn}
         {sidebarOpen ? (
           <>
@@ -651,14 +643,6 @@ function fillVehicleDetails(vehicle: Vehicle) {
               <NavBtn
                 id="all"
                 label="All Tickets"
-                tab={tab}
-                onSelect={setTab}
-              />
-
-              <NavBtn
-                id="review"
-                label="Pending Review"
-                count={pending.length}
                 tab={tab}
                 onSelect={setTab}
               />
@@ -728,7 +712,6 @@ function fillVehicleDetails(vehicle: Vehicle) {
             {([
               ["submit", "＋", "Issue Ticket"],
               ["all", "☰", "All Tickets"],
-              ["review", "◎", "Pending Review"],
             ] as [Tab, string, string][]).map(([id, icon, label]) => (
               <button
                 key={id}
@@ -764,19 +747,6 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 }}
               >
                 {icon}
-                {id === "review" && pending.length > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: 2,
-                      right: 2,
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: "var(--color-primary)",
-                    }}
-                  />
-                )}
               </button>
             ))}
           </nav>
@@ -784,13 +754,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
       </aside>
 
       {/* Content */}
-      <div
-        style={{
-          background: "var(--color-panel)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div className="admin-content">
         <nav aria-label="Ticket navigation" className="flex border-b border-rule bg-white px-6">
           {([
             ["submit", "Issue Ticket"],
@@ -812,7 +776,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
           ))}
         </nav>
 
-        <div style={{ padding: 24, flex: 1 }}>
+        <div className="admin-page-content">
           {tab === "submit" && (
             <form style={{ maxWidth: 640 }} onSubmit={(e) => { e.preventDefault(); saveTicket("issued") }}>
               <div style={{ marginBottom: 24 }}>
@@ -854,7 +818,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                   </select>
                 </Field>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
+              <div className="admin-form-grid">
                 <Field label="STUDENT ID">
                   <input
                     aria-label="Student ID"
@@ -877,14 +841,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 </Field>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 80px",
-                  gap: 14,
-                  marginBottom: 14,
-                }}
-              >
+              <div className="admin-form-grid admin-plate-grid">
                 <Field label="LICENSE PLATE *">
                   <input
                     required
@@ -978,14 +935,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                   />
                 </Field>
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 14,
-                  marginBottom: 14,
-                }}
-              >
+              <div className="admin-form-grid">
                 <Field label="VEHICLE MAKE">
                   <input
                     value={form.make}
@@ -1052,14 +1002,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 </Field>
 
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 120px",
-                  gap: 14,
-                  marginBottom: 14,
-                }}
-              >
+              <div className="admin-form-grid admin-location-grid">
                 <Field label="LOCATION *">
                   <input
                     required
@@ -1243,6 +1186,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                   overflow: "hidden",
                 }}
               >
+                <div className="admin-desktop-tickets">
                 <TicketTable
                   tickets={filtered}
                   onSelect={setEditing}
@@ -1339,163 +1283,112 @@ function fillVehicleDetails(vehicle: Vehicle) {
                     </div>
                   )}
                 />
-              </div>
-            </div>
-          )}
+                </div>
+                <div className="admin-mobile-tickets">
+                  {filtered.length === 0 ? (
+                    <p>No tickets found.</p>
+                  ) : (
+                    filtered.map((ticket) => (
+                      <details key={ticket.id}>
+                        <summary>
+                          Ticket #{ticket.id} — {ticket.plate}
+                        </summary>
 
-          {tab === "review" && (
-            <div>
-              <div style={{ marginBottom: 20 }}>
-                <div
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 700,
-                    fontSize: 20,
-                    color: "var(--color-ink)",
-                  }}
-                >
-                  Pending Review
+                        <div className="admin-mobile-ticket-details">
+                          {[
+                            ["Student ID", ticket.studentId],
+                            ["Violator Name", ticket.violatorName],
+                            ["License Plate State", ticket.state],
+                            ["Vehicle Make", ticket.vehicleMake],
+                            ["Vehicle Model", ticket.vehicleModel],
+                            ["Vehicle Color", ticket.vehicleColor],
+                            ["Violation", ticket.violation],
+                            ["Location", ticket.location],
+                            ["Fine", `$${ticket.fine.toFixed(2)}`],
+                            ["Date Issued", new Date(ticket.issuedAt).toLocaleString()],
+                            ["Officer", ticket.officerName],
+                            ["Officer ID", ticket.officerId],
+                            ["Status", ticket.status],
+                            ["Notes", ticket.notes],
+                          ].map(([label, value]) => (
+                            <div key={label}>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  color: "var(--color-ink-mid)",
+                                  marginBottom: 3,
+                                }}
+                              >
+                                {label}
+                              </div>
+                              <div>{value || "Not recorded"}</div>
+                            </div>
+                          ))}
+
+                          <div className="admin-mobile-ticket-actions">
+                            <button
+                              type="button"
+                              onClick={() => setEditing(ticket)}
+                            >
+                              Edit
+                            </button>
+
+                            {ticket.status !== "appealed" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setTickets((prev) =>
+                                    prev.map((t) =>
+                                      t.id === ticket.id
+                                        ? { ...t, status: "appealed" }
+                                        : t
+                                    )
+                                  )
+                                }
+                              >
+                                Appeal
+                              </button>
+                            )}
+
+                            {ticket.status !== "flagged" &&
+                              ticket.status !== "resolved" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFlagging(ticket);
+                                    setFlagNotes(ticket.notes ?? "");
+                                  }}
+                                >
+                                  Flag
+                                </button>
+                              )}
+
+                            {ticket.status === "flagged" && (
+                              <button
+                                type="button"
+                                disabled={savingTicket}
+                                onClick={() => unflagTicket(ticket)}
+                              >
+                                Unflag
+                              </button>
+                            )}
+
+                            {ticket.status === "issued" && (
+                              <button
+                                type="button"
+                                onClick={() => setReviewing(ticket)}
+                              >
+                                Submit to Sells
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </details>
+                    ))
+                  )}
                 </div>
-                <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    color: "var(--color-ink-mid)",
-                    marginTop: 4,
-                  }}
-                >
-                  {pending.length} tickets awaiting admin review before
-                  submission to Sells.
-                </div>
-              </div>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
-              >
-                {pending.length === 0 ? (
-                  <div
-                    style={{
-                      textAlign: "center",
-                      padding: 60,
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 12,
-                      color: "var(--color-ink-mid)",
-                    }}
-                  >
-                    No tickets pending review.
-                  </div>
-                ) : (
-                  pending.map((t) => (
-                    <div
-                      key={t.id}
-                      style={{
-                        background: "#fff",
-                        borderRadius: 6,
-                        border: "1px solid var(--color-rule)",
-                        padding: 16,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 16,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 20,
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 11,
-                            color: "var(--color-primary)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {t.id}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 12,
-                            color: "var(--color-ink)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {t.plate}{" "}
-                          <span
-                            style={{
-                              color: "var(--color-ink-mid)",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {t.state}
-                          </span>
-                        </span>
-                        <span
-                          style={{ fontSize: 13, color: "var(--color-ink)" }}
-                        >
-                          {t.violation}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 11,
-                            color: "var(--color-ink-mid)",
-                          }}
-                        >
-                          {t.location}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                        >
-                          ${t.fine}
-                        </span>
-                        <StatusBadge status={t.status} />
-                      </div>
-                      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                        <button
-                          onClick={() => setEditing(t)}
-                          style={{
-                            fontFamily: "var(--font-display)",
-                            fontWeight: 500,
-                            fontSize: 12,
-                            padding: "7px 14px",
-                            borderRadius: 5,
-                            border: "1px solid var(--color-rule)",
-                            background: "#fff",
-                            color: "var(--color-ink-mid)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => setReviewing(t)}
-                          style={{
-                            fontFamily: "var(--font-display)",
-                            fontWeight: 600,
-                            fontSize: 12,
-                            padding: "7px 16px",
-                            borderRadius: 5,
-                            border: "1px solid var(--color-status-submitted)",
-                            background: "var(--color-status-submitted-soft)",
-                            color: "var(--color-status-submitted)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Submit to Sells
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
+
               </div>
             </div>
           )}
@@ -1509,14 +1402,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
           onClose={() => setEditing(null)}
           width={620}
         >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
-              marginBottom: 14,
-            }}
-          >
+          <div className="admin-edit-grid">
             <Field label="STUDENT ID">
               <input
                 aria-label="Student ID"
@@ -1552,6 +1438,39 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 style={{ ...inputStyle, fontFamily: "var(--font-mono)" }}
               />
             </Field>
+            <Field label="VEHICLE MAKE">
+              <input
+                value={editing.vehicleMake ?? ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, vehicleMake: e.target.value })
+                }
+                placeholder="e.g. Toyota"
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label="VEHICLE MODEL">
+              <input
+                value={editing.vehicleModel ?? ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, vehicleModel: e.target.value })
+                }
+                placeholder="e.g. Camry"
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label="VEHICLE COLOR">
+              <input
+                value={editing.vehicleColor ?? ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, vehicleColor: e.target.value })
+                }
+                placeholder="e.g. Silver"
+                style={inputStyle}
+              />
+            </Field>
+
             <Field label="VIOLATION TYPE">
               <select value={editing.violation}
                 onChange={(e) => setEditing({ ...editing, violation: e.target.value })} style={inputStyle}>

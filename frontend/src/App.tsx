@@ -4,6 +4,8 @@ import OfficerView from "./views/OfficerView.tsx";
 import AdminView from "./views/AdminView.tsx";
 import SellsView from "./views/SellsView.tsx";
 import { SAMPLE_TICKETS, type Ticket } from "./data/tickets.ts";
+import "./App.css";
+
 
 type Role = "officer" | "admin" | "sells";
 
@@ -34,12 +36,9 @@ export default function App() {
   const current = ROLES.find((r) => r.id === role)!;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ fontFamily: "var(--font-body)" }}>
+    <div className="app-container" style={{ fontFamily: "var(--font-body)" }}>
       {/* Top bar */}
-      <header
-        style={{ background: "var(--color-surface-dark)", borderBottom: "1px solid var(--color-surface-dark-light)" }}
-        className="px-6 py-3 flex items-center justify-between gap-4"
-      >
+      <header className="app-header">
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 flex items-center justify-center rounded"
@@ -58,7 +57,7 @@ export default function App() {
         </div>
 
         {/* Role switcher */}
-        <div className="flex items-center gap-1" style={{ background: "var(--color-surface-dark-mid)", borderRadius: 6, padding: 3 }}>
+        <div className="app-role-switcher">
           {ROLES.map((r) => (
             <button
               key={r.id}
@@ -101,7 +100,7 @@ export default function App() {
       </header>
 
       {/* Main */}
-      <main className="flex-1">
+      <main className="app-main">
         {role === "officer" && <OfficerView tickets={tickets} setTickets={setTickets} />}
         {role === "admin" && <AdminView tickets={tickets} setTickets={setTickets} />}
         {role === "sells" && <SellsView tickets={tickets} setTickets={setTickets} />}
