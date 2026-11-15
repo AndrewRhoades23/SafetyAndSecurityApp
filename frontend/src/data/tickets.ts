@@ -15,6 +15,7 @@ export interface Ticket {
   status: TicketStatus
   notes?: string
   vehicleMake?: string
+  vehicleModel?: string
   vehicleColor?: string
 }
 
@@ -41,7 +42,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-003",
     officerName: "J. Martinez",
     status: "issued",
-    vehicleMake: "Toyota Camry",
+    vehicleMake: "Toyota",
+    vehicleModel: "Camry",
     vehicleColor: "Silver",
     notes: "Vehicle parked 45 min past expiry.",
   },
@@ -56,7 +58,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-003",
     officerName: "J. Martinez",
     status: "submitted",
-    vehicleMake: "Honda Civic",
+    vehicleMake: "Honda",
+    vehicleModel: "Civic",
     vehicleColor: "Black",
   },
   {
@@ -70,7 +73,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-007",
     officerName: "R. Singh",
     status: "flagged",
-    vehicleMake: "Ford F-150",
+    vehicleMake: "Ford",
+    vehicleModel: "F-150",
     vehicleColor: "Red",
     notes: "Vehicle blocking access by 18 inches.",
   },
@@ -85,7 +89,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-003",
     officerName: "J. Martinez",
     status: "resolved",
-    vehicleMake: "Chevrolet Malibu",
+    vehicleMake: "Chevrolet",
+    vehicleModel: "Malibu",
     vehicleColor: "White",
   },
   {
@@ -99,7 +104,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-012",
     officerName: "T. Okafor",
     status: "submitted",
-    vehicleMake: "Nissan Altima",
+    vehicleMake: "Nissan",
+    vehicleModel: "Altima",
     vehicleColor: "Blue",
   },
   {
@@ -113,7 +119,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-007",
     officerName: "R. Singh",
     status: "flagged",
-    vehicleMake: "BMW 3 Series",
+    vehicleMake: "BMW",
+    vehicleModel: "3 Series",
     vehicleColor: "Gray",
     notes: "No placard displayed. Owner contacted.",
   },
@@ -128,7 +135,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-003",
     officerName: "J. Martinez",
     status: "issued",
-    vehicleMake: "Kia Sorento",
+    vehicleMake: "Kia",
+    vehicleModel: "Sorento",
     vehicleColor: "Green",
   },
   {
@@ -142,7 +150,8 @@ export const SAMPLE_TICKETS: Ticket[] = [
     officerId: "OFF-003",
     officerName: "J. Martinez",
     status: "submitted",
-    vehicleMake: "Toyota Camry",
+    vehicleMake: "Toyota",
+    vehicleModel: "Camry",
     vehicleColor: "Silver",
   },
 ]
