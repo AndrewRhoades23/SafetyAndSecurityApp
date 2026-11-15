@@ -120,8 +120,8 @@ export default function OfficerView({ tickets, setTickets }: {
     studentId: "",
     violatorName: "",
     plate: "",
-    state: "",
-    violation: VIOLATIONS[0],
+    state: "CA",
+    violation: "",
     location: "",
     fine: "",
     make: "",
@@ -146,7 +146,7 @@ export default function OfficerView({ tickets, setTickets }: {
 }, []);
 
   function resetForm() {
-    setForm({ studentId: "", violatorName: "", plate: "", state: "CA", violation: VIOLATIONS[0], location: "", fine: "", make: "", model: "", color: "", notes: "" })
+    setForm({ studentId: "", violatorName: "", plate: "", state: "CA", violation: "", location: "", fine: "", make: "", model: "", color: "", notes: "" })
     setEditingId(null)
     setEditError("")
   }
@@ -242,44 +242,119 @@ async function lookupVehicle() {
     setTab("submit")
   }
 
-  function saveTicket(status: "draft" | "issued") {
-    const details = {
-      studentId: form.studentId.trim(),
-      violatorName: form.violatorName.trim(),
-      plate: form.plate.trim(),
-      state: form.state.trim(),
-      violation: form.violation,
-      location: form.location.trim(),
-      fine: Number(form.fine),
-      vehicleMake: form.make.trim(),
-      vehicleModel: form.model.trim(),
-      vehicleColor: form.color.trim(),
-      notes: form.notes.trim(),
-    }
-    if (editingId) {
-      if (!editingTicket || !canEditTicket(editingTicket)) {
-        setEditError("This ticket is no longer available for you to edit.")
-        return
-      }
-      setTickets((prev) => prev.map((ticket) =>
-        ticket.id === editingId && canEditTicket(ticket)
-          ? { ...ticket, ...details }
-          : ticket,
-      ))
-    } else {
-      const ticket: Ticket = {
-        ...details,
-        id: `TKT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-        issuedAt: new Date().toISOString(),
-        officerId: OFFICER_ID,
-        officerName: "J. Martinez",
-        status,
-      }
-      setTickets((prev) => [ticket, ...prev])
-    }
-    resetForm()
-    setTab("tickets")
+async function saveTicket(status: "draft" | "issued") {
+  const details = {
+    studentId: form.studentId.trim(),
+    violatorName: form.violatorName.trim(),
+    plate: form.plate.trim(),
+    state: form.state.trim(),
+    violation: form.violation,
+    location: form.location.trim(),
+    fine: Number(form.fine),
+    vehicleMake: form.make.trim(),
+    vehicleModel: form.model.trim(),
+    vehicleColor: form.color.trim(),
+    notes: form.notes.trim(),
+  };
+
+  // Existing tickets are still edited locally for now.
+  
+if (editingId) {
+  if (!editingTicket || !canEditTicket(editingTicket)) {
+    setEditError("This ticket is no longer available for you to edit.");
+    return;
   }
+
+  if (savingTicket) return;
+
+  setSavingTicket(true);
+  setEditError("");
+
+  try {
+    const updatedTicket = await updateTicket(editingId, {
+      studentId: details.studentId,
+      violatorName: details.violatorName,
+      licensePlate: details.plate,
+      state: details.state,
+      vehicleMake: details.vehicleMake,
+      vehicleModel: details.vehicleModel,
+      vehicleColor: details.vehicleColor,
+      violationType: details.violation,
+      location: details.location,
+      fineAmount: details.fine,
+      notes: details.notes,
+      officerId: editingTicket.officerId,
+      officerName: editingTicket.officerName,
+      status: editingTicket.status,
+    });
+
+    // Replace the existing ticket in React state.
+    setTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === editingId ? updatedTicket : ticket
+      )
+    );
+
+    resetForm();
+    setTab("tickets");
+  } catch (error) {
+    console.error(error);
+
+    setEditError(
+      error instanceof Error
+        ? error.message
+        : "Unable to update ticket."
+    );
+  } finally {
+    setSavingTicket(false);
+  }
+
+  return;
+}
+
+
+  // Prevent duplicate submissions.
+  if (savingTicket) return;
+
+  setSavingTicket(true);
+  setEditError("");
+
+  try {
+    // Save drafts and issued tickets to SQLite.
+    const savedTicket = await createTicket({
+      studentId: details.studentId,
+      violatorName: details.violatorName,
+      licensePlate: details.plate,
+      state: details.state,
+      vehicleMake: details.vehicleMake,
+      vehicleModel: details.vehicleModel,
+      vehicleColor: details.vehicleColor,
+      violationType: details.violation,
+      location: details.location,
+      fineAmount: details.fine,
+      notes: details.notes,
+      officerId: OFFICER_ID,
+      officerName: "J. Martinez",
+      status,
+    });
+
+    setTickets((prev) => [savedTicket, ...prev]);
+
+    resetForm();
+    setTab("tickets");
+  } catch (error) {
+    console.error(error);
+
+    setEditError(
+      error instanceof Error
+        ? error.message
+        : "Unable to save ticket."
+    );
+  } finally {
+    setSavingTicket(false);
+  }
+}
+
 
   const filtered = useMemo(() => {
     let list = tickets.filter((t) =>
@@ -720,7 +795,6 @@ async function lookupVehicle() {
                     onChange={(e) =>
                       setForm({ ...form, state: e.target.value.toUpperCase() })
                     }
-                    placeholder="e.g. CA"
                     maxLength={2}
                     style={{
                       ...inputStyle,
@@ -1054,7 +1128,7 @@ async function lookupVehicle() {
               ["Plate", `${selected.plate} (${selected.state})`],
               [
                 "Vehicle",
-                `${selected.vehicleMake ?? "—"} ${selected.vehicleModel ?? "—"} ${selected.vehicleColor ?? "—"} `,
+                `${selected.vehicleColor ?? "—"} ${selected.vehicleMake ?? "—"} ${selected.vehicleModel ?? "—"}`,
               ],
               ["Violation", selected.violation],
               ["Fine", `$${selected.fine}`],

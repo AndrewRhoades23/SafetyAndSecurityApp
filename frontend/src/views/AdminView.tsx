@@ -151,11 +151,12 @@ export default function AdminView({ tickets, setTickets }: {
     studentId: "",
     violatorName: "",
     plate: "",
-    state: "CA",
-    violation: "",
+    state: "",
+    violation:"",
     location: "",
     fine: "",
     make: "",
+    model: "",
     color: "",
     notes: "",
     officerId: "ADM-001",
@@ -217,7 +218,7 @@ async function saveTicket(status: "draft" | "issued") {
       licensePlate: form.plate.trim(),
       state: form.state.trim(),
       vehicleMake: form.make.trim(),
-      vehicleModel: "",
+      vehicleModel: form.model.trim(),
       vehicleColor: form.color.trim(),
       violationType: form.violation,
       location: form.location.trim(),
@@ -238,6 +239,7 @@ async function saveTicket(status: "draft" | "issued") {
       location: "",
       fine: "",
       make: "",
+      model: "",
       color: "",
       notes: "",
     }));
@@ -282,6 +284,7 @@ async function lookupVehicle() {
         violatorName: "",
         state: "",
         make: "",
+        model: "",
         color: "",
       }));
 
@@ -312,7 +315,8 @@ function fillVehicleDetails(vehicle: Vehicle) {
     state: vehicle.state,
     studentId: vehicle.studentId,
     violatorName: vehicle.violatorName,
-    make: `${vehicle.vehicleMake} ${vehicle.vehicleModel}`.trim(),
+    make: vehicle.vehicleMake,
+    model: vehicle.vehicleModel,
     color: vehicle.vehicleColor,
   }));
 
@@ -364,7 +368,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
         licensePlate: t.plate,
         state: t.state,
         vehicleMake: t.vehicleMake ?? "",
-        vehicleModel: "",
+        vehicleModel: t.vehicleModel ??"",
         vehicleColor: t.vehicleColor ?? "",
         violationType: t.violation,
         location: t.location,
@@ -408,7 +412,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
         licensePlate: t.plate,
         state: t.state,
         vehicleMake: t.vehicleMake ?? "",
-        vehicleModel: "",
+        vehicleModel: t.vehicleModel ?? "",
         vehicleColor: t.vehicleColor ?? "",
         violationType: t.violation,
         location: t.location,
@@ -458,7 +462,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
         licensePlate: t.plate,
         state: t.state,
         vehicleMake: t.vehicleMake ?? "",
-        vehicleModel: "",
+        vehicleModel: t.vehicleModel ?? "",
         vehicleColor: t.vehicleColor ?? "",
         violationType: t.violation,
         location: t.location,
@@ -501,7 +505,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
         licensePlate: t.plate,
         state: t.state,
         vehicleMake: t.vehicleMake ?? "",
-        vehicleModel: "",
+        vehicleModel: t.vehicleModel ?? "",
         vehicleColor: t.vehicleColor ?? "",
         violationType: t.violation,
         location: t.location,
@@ -893,6 +897,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                         violatorName: "",
                         state: "",
                         make: "",
+                        model: "",
                         color: "",
                       }));
 
@@ -963,6 +968,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                     onChange={(e) =>
                       setForm({ ...form, state: e.target.value.toUpperCase() })
                     }
+                    placeholder="e.g. CA"
                     maxLength={2}
                     style={{
                       ...inputStyle,
@@ -984,7 +990,15 @@ function fillVehicleDetails(vehicle: Vehicle) {
                   <input
                     value={form.make}
                     onChange={(e) => setForm({ ...form, make: e.target.value })}
-                    placeholder="e.g. Toyota Camry"
+                    placeholder="e.g. Toyota"
+                    style={inputStyle}
+                  />
+                </Field>
+                <Field label="VEHICLE MODEL">
+                  <input
+                    value={form.model}
+                    onChange={(e) => setForm({ ...form, model: e.target.value })}
+                    placeholder="e.g. Camry"
                     style={inputStyle}
                   />
                 </Field>
