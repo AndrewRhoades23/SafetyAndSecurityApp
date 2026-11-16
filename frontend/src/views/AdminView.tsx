@@ -1207,20 +1207,30 @@ function fillVehicleDetails(vehicle: Vehicle) {
                         }}
                       >
                         Edit
-                      </button>
+                      </button>                   
                       {t.status !== "appealed" && (
                         <button
                           type="button"
-                          onClick={() => setTickets((prev) =>
-                            prev.map((ticket) => ticket.id === t.id
-                              ? { ...ticket, status: "appealed" }
-                              : ticket),
-                          )}
-                          className="col-start-2 row-start-1 font-mono text-xs px-2 py-1 rounded border border-status-issued bg-status-issued-soft text-status-issued cursor-pointer"
+                          onClick={() =>
+                            setTickets((prev) =>
+                              prev.map((ticket) =>
+                                ticket.id === t.id
+                                  ? { ...ticket, status: "appealed" }
+                                  : ticket
+                              )
+                            )
+                          }
+                          className="col-start-2 row-start-1 font-mono text-xs px-2 py-1 rounded cursor-pointer"
+                          style={{
+                            border: "1px solid var(--color-primary)",
+                            background: "var(--color-primary-soft)",
+                            color: "var(--color-primary)",
+                          }}
                         >
                           Appeal
                         </button>
                       )}
+
                       {t.status !== "flagged" && t.status !== "resolved" && (
                         <button
                           className="col-start-1 row-start-2"
@@ -1336,7 +1346,13 @@ function fillVehicleDetails(vehicle: Vehicle) {
 
                             {ticket.status !== "appealed" && (
                               <button
+                                className="col-start-2 row-start-1 font-mono text-xs px-2 py-1 rounded cursor-pointer"
                                 type="button"
+                                style={{
+                                  border: "1px solid var(--color-primary)",
+                                  background: "var(--color-primary-soft)",
+                                  color: "var(--color-primary)",
+                                }}
                                 onClick={() =>
                                   setTickets((prev) =>
                                     prev.map((t) =>
