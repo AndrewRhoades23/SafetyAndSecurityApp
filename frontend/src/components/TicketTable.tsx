@@ -1,5 +1,6 @@
 import type { Ticket } from "../data/tickets.ts";
 import StatusBadge from "./StatusBadge";
+import { readTicketNotes } from "../utils/multiViolationNotes";
 
 interface Props {
   tickets: Ticket[];
@@ -90,7 +91,42 @@ export default function TicketTable({ tickets, onSelect, actions }: Props) {
                   <div className="text-sm">{t.violatorName || "Not recorded"}</div>
                   <div className="font-mono text-xs text-ink-mid">{t.studentId || "—"}</div>
                 </td>
-                <td style={{ padding: "10px 12px", fontSize: 13, color: "var(--color-ink)" }}>{t.violation}</td>
+                <td
+                  style={{
+                    padding: "10px 12px",
+                    fontSize: 13,
+                    color: "var(--color-ink)",
+                  }}
+                >
+                  {(() => {
+                    const violations = readTicketNotes(
+                      t.notes ?? "",
+                      t.violation
+                    ).selectedViolations;
+
+                    return (
+                      <div>
+                        <div>
+                          {violations[0] || t.violation || "Not selected"}
+                        </div>
+
+                        {violations.length > 1 && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: "var(--color-primary)",
+                            }}
+                          >
+                            +{violations.length - 1} more violation
+                            {violations.length - 1 !== 1 ? "s" : ""}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </td>
                 <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-ink-mid)" }}>{t.location}</td>
                 <td style={{ padding: "10px 12px" }}>
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-ink)", fontWeight: 500 }}>

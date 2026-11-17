@@ -5,6 +5,7 @@ import SearchBar from "../components/SearchBar";
 import StatusBadge from "../components/StatusBadge";
 import Modal from "../components/Modal";
 import { updateTicket } from "../services/ticketServices";
+import { readTicketNotes } from "../utils/multiViolationNotes";
 
 type DateRange = "all" | "today" | "week" | "month";
 
@@ -77,6 +78,10 @@ export default function SellsView({ tickets, setTickets }: {
     [tickets],
   );
   const selected = sellsTickets.find((ticket) => ticket.id === selectedId);
+
+  const selectedDetails = selected
+    ? readTicketNotes(selected.notes ?? "", selected.violation)
+    : null;
 
   async function markAsDone(ticket: Ticket) {
     if (ticket.status !== "submitted") return;
@@ -286,10 +291,81 @@ export default function SellsView({ tickets, setTickets }: {
             <StatusBadge status={selected.status} />
           </div>
 
-          {selected.notes && (
+          {selectedDetails && (
+            <div
+              style={{
+                border: "1px solid var(--color-rule)",
+                borderRadius: 6,
+                padding: 16,
+                marginBottom: 16,
+                background: "#fff",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--color-ink)",
+                  marginBottom: 12,
+                }}
+              >
+                VIOLATIONS ON THIS TICKET
+              </div>
+
+              {selectedDetails.selectedViolations.map((name, index) => (
+                <div
+                  key={`${name}-${index}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "7px 0",
+                    borderBottom: "1px solid var(--color-rule)",
+                    color: "var(--color-ink)",
+                    fontSize: 13,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--color-ink-mid)",
+                    }}
+                  >
+                    {index + 1}.
+                  </span>
+                  {name}
+                </div>
+              ))}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: 14,
+                }}
+              >
+                <strong style={{ fontSize: 13 }}>
+                  TOTAL TICKET FINE
+                </strong>
+
+                <strong
+                  style={{
+                    fontSize: 20,
+                    color: "var(--color-primary)",
+                  }}
+                >
+                  ${selected.fine.toFixed(2)}
+                </strong>
+              </div>
+            </div>
+          )}
+
+          {selectedDetails?.officerNotes && (
             <div style={{ marginTop: 12, padding: 12, background: "var(--color-panel-alt)", borderRadius: 5, borderLeft: "3px solid var(--color-primary)" }}>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--color-ink-mid)", fontWeight: 600, marginBottom: 4 }}>OFFICER NOTES</div>
-              <div style={{ fontSize: 13, color: "var(--color-ink)" }}>{selected.notes}</div>
+              <div style={{ fontSize: 13, color: "var(--color-ink)" }}>{selectedDetails.officerNotes}</div>
             </div>
           )}
 

@@ -8,6 +8,11 @@ import Modal from "../components/Modal"
 import { getViolationTypes, type ViolationType } from "../services/violationtypeService"
 import { createTicket, updateTicket } from "../services/ticketServices.ts";
 import "../OfficerView.css"
+import MultiViolationSelector from "../components/MultiViolationSelector";
+import {
+  buildTicketNotes,
+  readTicketNotes,
+} from "../utils/multiViolationNotes";
 
 type Tab = "submit" | "tickets"
 type Sort = "newest" | "oldest" | "status"
@@ -115,6 +120,7 @@ export default function OfficerView({ tickets, setTickets }: {
   const [violationTypes, setViolationTypes] = useState<ViolationType[]>([]);
   const [violationTypesError, setViolationTypesError] = useState("");
   const [savingTicket, setSavingTicket] = useState(false);
+  const [selectedViolations, setSelectedViolations] = useState<string[]>([]);
 
   // Form state
   const [form, setForm] = useState({
@@ -146,11 +152,27 @@ export default function OfficerView({ tickets, setTickets }: {
   loadViolationTypes();
 }, []);
 
+
   function resetForm() {
-    setForm({ studentId: "", violatorName: "", plate: "", state: "CA", violation: "", location: "", fine: "", make: "", model: "", color: "", notes: "" })
-    setEditingId(null)
-    setEditError("")
+    setForm({
+      studentId: "",
+      violatorName: "",
+      plate: "",
+      state: "CA",
+      violation: "",
+      location: "",
+      fine: "",
+      make: "",
+      model: "",
+      color: "",
+      notes: "",
+    });
+
+    setSelectedViolations([]);
+    setEditingId(null);
+    setEditError("");
   }
+
 
   
 
@@ -224,8 +246,16 @@ async function lookupVehicle() {
 
   function startEditing(ticket: Ticket) {
     if (!canEditTicket(ticket)) return
-    setEditingId(ticket.id)
-    setEditError("")
+    setEditingId(ticket.id);
+
+    setEditError("");
+    const restored = readTicketNotes(
+    ticket.notes ?? "",
+    ticket.violation
+    );
+
+    setSelectedViolations(restored.selectedViolations);
+
     setForm({
       studentId: ticket.studentId ?? "",
       violatorName: ticket.violatorName ?? "",
@@ -237,7 +267,7 @@ async function lookupVehicle() {
       make: ticket.vehicleMake ?? "",
       model: ticket.vehicleModel ?? "",
       color: ticket.vehicleColor ?? "",
-      notes: ticket.notes ?? "",
+      notes: restored.officerNotes,
     })
     setSelected(null)
     setTab("submit")
@@ -255,8 +285,17 @@ async function saveTicket(status: "draft" | "issued") {
     vehicleMake: form.make.trim(),
     vehicleModel: form.model.trim(),
     vehicleColor: form.color.trim(),
-    notes: form.notes.trim(),
+    notes: buildTicketNotes(
+      selectedViolations,
+      violationTypes,
+      form.notes
+    ),
   };
+
+  if (status === "issued" && selectedViolations.length === 0) {
+    setEditError("Please select at least one violation.");
+    return;
+  }
 
   // Existing tickets are still edited locally for now.
   
@@ -812,39 +851,34 @@ if (editingId) {
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <Field label="VIOLATION TYPE *">
-                  <select
-                    value={form.violation}
-                    onChange={(e) => {
-                      const selectedType = violationTypes.find(
-                        (type) => type.name === e.target.value
-                      );
+                <MultiViolationSelector
+                  violationTypes={violationTypes}
+                  selectedViolations={selectedViolations}
+                  onChange={(violations) => {
+                    setSelectedViolations(violations);
 
-                      setForm((prev) => ({
-                        ...prev,
-                        violation: e.target.value,
-                        fine: selectedType
-                          ? String(selectedType.defaultFine)
-                          : "",
-                      }));
-                    }}
-                    style={inputStyle}
-                    disabled={violationTypes.length === 0}
-                  >
-                    <option value="">Select a violation</option>
+                    const selectedTypes = violationTypes.filter((type) =>
+                      violations.includes(type.name)
+                    );
 
-                    {violationTypes.map((type) => (
-                      <option key={type.id} value={type.name}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                  {violationTypesError && (
-                    <p role="alert" style={{ color: "red", fontSize: 12 }}>
-                      {violationTypesError}
-                    </p>
-                  )}
-                </Field>
+                    const total = selectedTypes.reduce(
+                      (sum, type) => sum + type.defaultFine,
+                      0
+                    );
+
+                    setForm((prev) => ({
+                      ...prev,
+                      violation: selectedTypes[0]?.name ?? "",
+                      fine: violations.length > 0 ? String(total) : "",
+                    }));
+                  }}
+                />
+
+                {violationTypesError && (
+                  <p role="alert" style={{ color: "red", fontSize: 12 }}>
+                    {violationTypesError}
+                  </p>
+                )}
               </div>
 
               <div className="officer-form-grid officer-location-grid">

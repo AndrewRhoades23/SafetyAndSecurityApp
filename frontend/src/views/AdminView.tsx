@@ -10,6 +10,11 @@ import Modal from "../components/Modal"
 import { createTicket, updateTicket } from "../services/ticketServices.ts"
 import { searchVehicles, type Vehicle } from "../services/vehicleService"
 import "../AdminView.css"
+import MultiViolationSelector from "../components/MultiViolationSelector";
+import {
+  buildTicketNotes,
+  readTicketNotes,
+} from "../utils/multiViolationNotes";
 
 type ViolationType = {
   id: number;
@@ -136,11 +141,15 @@ export default function AdminView({ tickets, setTickets }: {
   const [violationTypesError, setViolationTypesError] = useState("");
   const [tab, setTab] = useState<Tab>("all")
   const [savingTicket, setSavingTicket] = useState(false);
+  const [selectedViolations, setSelectedViolations] = useState<string[]>([]);
   const [saveError, setSaveError] = useState("");
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<"newest" | "oldest">("newest")
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all")
   const [editing, setEditing] = useState<Ticket | null>(null)
+  const [editSelectedViolations, setEditSelectedViolations] =
+    useState<string[]>([]);
+  const [editOfficerNotes, setEditOfficerNotes] = useState("");
   const [reviewing, setReviewing] = useState<Ticket | null>(null)
   const [flagging, setFlagging] = useState<Ticket | null>(null)
   const [flagNotes, setFlagNotes] = useState("")
@@ -176,17 +185,6 @@ export default function AdminView({ tickets, setTickets }: {
       setViolationTypes(data);
       setViolationTypesError("");
 
-      if (data.length > 0) {
-        setForm((prev) => {
-          if (prev.violation) return prev;
-
-          return {
-            ...prev,
-            violation: data[0].name,
-            fine: String(data[0].defaultFine),
-          };
-        });
-      }
     } catch (error) {
       console.error("Error loading violation types:", error);
       setViolationTypesError("Unable to load violation types.");
@@ -199,6 +197,11 @@ export default function AdminView({ tickets, setTickets }: {
   
 async function saveTicket(status: "draft" | "issued") {
   if (savingTicket) return;
+
+  if (status === "issued" && selectedViolations.length === 0) {
+    setSaveError("Please select at least one violation.");
+    return;
+  }
 
   const officer = OFFICERS.find(
     (o) => o.id === form.officerId
@@ -224,7 +227,11 @@ async function saveTicket(status: "draft" | "issued") {
       violationType: form.violation,
       location: form.location.trim(),
       fineAmount: Number(form.fine),
-      notes: form.notes.trim(),
+      notes: buildTicketNotes(
+        selectedViolations,
+        violationTypes,
+        form.notes
+      ),
       officerId: officer.id,
       officerName: officer.name,
       status,
@@ -232,11 +239,14 @@ async function saveTicket(status: "draft" | "issued") {
 
     setTickets((prev) => [savedTicket, ...prev]);
 
+    setSelectedViolations([]);
+
     setForm((prev) => ({
       ...prev,
       studentId: "",
       violatorName: "",
       plate: "",
+      violation: "",
       location: "",
       fine: "",
       make: "",
@@ -246,7 +256,7 @@ async function saveTicket(status: "draft" | "issued") {
     }));
 
     setLookupMessage("");
-  setVehicleMatches([]);
+    setVehicleMatches([]);
 
     setTab("all");
   } catch (error) {
@@ -418,7 +428,11 @@ function fillVehicleDetails(vehicle: Vehicle) {
         violationType: t.violation,
         location: t.location,
         fineAmount: t.fine,
-        notes: notes.trim(),
+        notes: buildTicketNotes(
+          readTicketNotes(t.notes ?? "", t.violation).selectedViolations,
+          violationTypes,
+          notes
+        ),
         officerId: t.officerId,
         officerName: t.officerName,
         status: "flagged",
@@ -493,8 +507,25 @@ function fillVehicleDetails(vehicle: Vehicle) {
   }
 
 
+  function openEditTicket(ticket: Ticket) {
+    const restored = readTicketNotes(
+      ticket.notes ?? "",
+      ticket.violation
+    );
+
+    setEditSelectedViolations(restored.selectedViolations);
+    setEditOfficerNotes(restored.officerNotes);
+    setEditing({ ...ticket });
+  }
+
+
   async function saveChanges(t: Ticket) {
     if (savingTicket) return;
+
+    if (editSelectedViolations.length === 0 && t.status !== "draft") {
+      setSaveError("Please select at least one violation.");
+      return;
+    }
 
     setSavingTicket(true);
     setSaveError("");
@@ -511,7 +542,11 @@ function fillVehicleDetails(vehicle: Vehicle) {
         violationType: t.violation,
         location: t.location,
         fineAmount: t.fine,
-        notes: t.notes ?? "",
+        notes: buildTicketNotes(
+          editSelectedViolations,
+          violationTypes,
+          editOfficerNotes
+        ),
         officerId: t.officerId,
         officerName: t.officerName,
         status: t.status,
@@ -964,43 +999,36 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 </Field>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <Field label="VIOLATION TYPE *">
-                  <select
-                    value={form.violation}
-                    onChange={(e) => {
-                      const selected = violationTypes.find(
-                        (v) => v.name === e.target.value
-                      );
+                <MultiViolationSelector
+                  violationTypes={violationTypes}
+                  selectedViolations={selectedViolations}
+                  onChange={(violations) => {
+                    setSelectedViolations(violations);
 
-                      setForm((prev) => ({
-                        ...prev,
-                        violation: e.target.value,
-                        fine: selected
-                          ? String(selected.defaultFine)
-                          : prev.fine,
-                      }));
-                    }}
-                    disabled={violationTypes.length === 0}
-                    style={inputStyle}
-                  >
-                    {violationTypes.length === 0 && (
-                      <option value="">No violations loaded</option>
-                    )}
+                    const selectedTypes = violationTypes.filter((type) =>
+                      violations.includes(type.name)
+                    );
 
-                    {violationTypes.map((v) => (
-                      <option key={v.id} value={v.name}>
-                        {v.name}
-                      </option>
-                    ))}
-                  </select>
+                    const total = selectedTypes.reduce(
+                      (sum, type) => sum + type.defaultFine,
+                      0
+                    );
 
-                  {violationTypesError && (
-                    <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
-                      {violationTypesError}
-                    </p>
-                  )}
-                </Field>
+                    setForm((prev) => ({
+                      ...prev,
+                      violation: selectedTypes[0]?.name ?? "",
+                      fine: selectedTypes.length > 0
+                        ? String(total)
+                        : "",
+                    }));
+                  }}
+                />
 
+                {violationTypesError && (
+                  <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+                    {violationTypesError}
+                  </p>
+                )}
               </div>
               <div className="admin-form-grid admin-location-grid">
                 <Field label="LOCATION *">
@@ -1189,12 +1217,12 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 <div className="admin-desktop-tickets">
                 <TicketTable
                   tickets={filtered}
-                  onSelect={setEditing}
+                  onSelect={openEditTicket}
                   actions={(t) => (
                     <div className="inline-grid w-max grid-flow-col auto-cols-max gap-1.5 whitespace-nowrap">
                       <button
                         className="col-start-1 row-start-1"
-                        onClick={() => setEditing(t)}
+                        onClick={() => openEditTicket(t)}
                         style={{
                           fontFamily: "var(--font-mono)",
                           fontSize: 10,
@@ -1236,7 +1264,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                           className="col-start-1 row-start-2"
                           onClick={() => {
                             setFlagging(t)
-                            setFlagNotes(t.notes ?? "")
+                            setFlagNotes(readTicketNotes(t.notes ?? "").officerNotes)
                           }}
                           style={{
                             fontFamily: "var(--font-mono)",
@@ -1339,7 +1367,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                           <div className="admin-mobile-ticket-actions">
                             <button
                               type="button"
-                              onClick={() => setEditing(ticket)}
+                              onClick={() => openEditTicket(ticket)}
                             >
                               Edit
                             </button>
@@ -1373,7 +1401,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
                                   type="button"
                                   onClick={() => {
                                     setFlagging(ticket);
-                                    setFlagNotes(ticket.notes ?? "");
+                                    setFlagNotes(readTicketNotes(ticket.notes ?? "").officerNotes)
                                   }}
                                 >
                                   Flag
@@ -1486,17 +1514,35 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 style={inputStyle}
               />
             </Field>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <MultiViolationSelector
+                violationTypes={violationTypes}
+                selectedViolations={editSelectedViolations}
+                onChange={(violations) => {
+                  setEditSelectedViolations(violations);
 
-            <Field label="VIOLATION TYPE">
-              <select value={editing.violation}
-                onChange={(e) => setEditing({ ...editing, violation: e.target.value })} style={inputStyle}>
-                {violationTypes.map((v) => (
-                  <option key={v.id} value={v.name}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                  const selectedTypes = violationTypes.filter((type) =>
+                    violations.includes(type.name)
+                  );
+
+                  const total = selectedTypes.reduce(
+                    (sum, type) => sum + type.defaultFine,
+                    0
+                  );
+
+                  setEditing((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          violation: selectedTypes[0]?.name ?? "",
+                          fine: total,
+                        }
+                      : null
+                  );
+                }}
+              />
+            </div>
+
             <Field label="FINE AMOUNT ($)">
               <input
                 type="number"
@@ -1522,8 +1568,8 @@ function fillVehicleDetails(vehicle: Vehicle) {
           </div>
           <Field label="NOTES">
             <textarea
-              value={editing.notes ?? ""}
-                onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
+              value={editOfficerNotes}
+              onChange={(e) => setEditOfficerNotes(e.target.value)}
               rows={3}
               style={{ ...inputStyle, resize: "vertical" }}
             />
