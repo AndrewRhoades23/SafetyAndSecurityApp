@@ -1,5 +1,12 @@
-export type TicketStatus = "draft" | "issued" | "submitted" | "flagged" | "appealed" | "resolved"
-
+export type TicketStatus =
+  | "draft"
+  | "issued"
+  | "reviewed"
+  | "submitted"
+  | "flagged"
+  | "appealed"
+  | "resolved"
+  
 export interface Ticket {
   id: string
   plate: string

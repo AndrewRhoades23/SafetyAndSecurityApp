@@ -36,6 +36,8 @@
   --color-status-submitted-soft: #dcfce7;
   --color-status-flagged: #991b1b;
   --color-status-flagged-soft: #fee2e2;
+  --color-status-reviewed: #1d4ed8;
+  --color-status-reviewed-soft: #dbeafe;
   --color-overlay: rgb(17 15 21 / 72%);
 }
 

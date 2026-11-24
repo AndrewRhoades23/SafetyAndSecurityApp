@@ -15,6 +15,11 @@ const CONFIG: Record<
     bg: "var(--color-status-issued-soft)",
     color: "var(--color-status-issued)",
   },
+  reviewed: {
+    label: "REVIEWED",
+    bg: "var(--color-status-reviewed-soft)",
+    color: "var(--color-status-reviewed)",
+  },
   submitted: {
     label: "SUBMITTED",
     bg: "var(--color-status-submitted-soft)",

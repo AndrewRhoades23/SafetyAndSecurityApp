@@ -188,21 +188,62 @@ app.MapPut("/api/parkingviolations/{id:int}", async (
         });
     }
 
-// Allow existing tickets to be updated,
-// including tickets submitted to Sells.
-if (existingViolation.Status != "draft" &&
-    existingViolation.Status != "issued" &&
-    existingViolation.Status != "flagged" &&
-    existingViolation.Status != "submitted")
+
+// Determine the current and requested ticket statuses.
+var currentStatus = existingViolation.Status;
+var requestedStatus = updatedViolation.Status;
+
+// Define valid ticket workflow transitions.
+var validTransition = currentStatus switch
+{
+    "draft" => requestedStatus is "draft" or "issued",
+
+    "issued" => requestedStatus is
+        "issued" or "reviewed" or "flagged" or "appealed",
+
+    "reviewed" => requestedStatus is
+        "reviewed" or "submitted" or "flagged" or "appealed",
+
+    "flagged" => requestedStatus is "flagged" or "issued",
+
+    "appealed" => requestedStatus is "appealed" or "issued",
+
+    "submitted" => requestedStatus is "submitted" or "resolved",
+
+    "resolved" => false,
+
+    _ => false
+};
+
+if (!validTransition)
+{
+    return Results.BadRequest(new
+    {
+        message = $"Cannot change ticket status from {currentStatus} to {requestedStatus}."
+    });
+}
+
+
+// Prevent submission before the appeal period expires.
+if (currentStatus == "reviewed" &&
+    requestedStatus == "submitted")
+{
+    var appealDeadline = existingViolation.DateIssued.AddDays(10);
+
+    if (DateTime.UtcNow < appealDeadline)
     {
         return Results.BadRequest(new
         {
-            message = "This ticket cannot be edited."
+            message = "This ticket cannot be submitted until the appeal period has expired.",
+            appealDeadline = appealDeadline
         });
     }
+}
 
-    // Require complete information for issued or flagged tickets.
-    if (existingViolation.Status != "draft")
+
+    // Require complete information whenever a ticket
+    // is no longer being saved as a draft.
+    if (requestedStatus != "draft")
     {
         if (string.IsNullOrWhiteSpace(updatedViolation.LicensePlate))
             return Results.BadRequest(new
@@ -272,32 +313,23 @@ if (existingViolation.Status != "draft" &&
     existingViolation.FineAmount = updatedViolation.FineAmount;
     existingViolation.Notes = updatedViolation.Notes;
 
-    // Validate the requested status.
-    var allowedStatuses = new[]
+    
+    // Start the appeal period when a draft is officially issued.
+    if (currentStatus == "draft" &&
+        requestedStatus == "issued")
     {
-        "draft",
-        "issued",
-        "flagged",
-        "appealed",
-        "submitted",
-        "resolved"
-    };
-
-    if (!allowedStatuses.Contains(updatedViolation.Status))
-    {
-        return Results.BadRequest(new
-        {
-            message = "Invalid ticket status."
-        });
+        existingViolation.DateIssued = DateTime.UtcNow;
     }
 
     // Update the ticket status.
-    existingViolation.Status = updatedViolation.Status;
+    existingViolation.Status = requestedStatus;
 
-    // Preserve the original ticket ID, officer, and date.
+    // Save the changes while preserving the original
+    // ticket ID and officer information.
     await db.SaveChangesAsync();
 
     return Results.Ok(existingViolation);
+
 });
 
 

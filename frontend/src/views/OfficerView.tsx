@@ -96,6 +96,13 @@ const inputStyle: React.CSSProperties = {
 
 const OFFICER_ID = "OFF-003"
 
+function canIssueDraft(ticket: Ticket) {
+  return (
+    ticket.status === "draft" &&
+    ticket.officerId === OFFICER_ID
+  )
+}
+
 function canEditTicket(ticket: Ticket) {
   return ticket.officerId === OFFICER_ID &&
     ["draft", "issued", "flagged"].includes(ticket.status)
@@ -304,6 +311,14 @@ if (editingId) {
     setEditError("This ticket is no longer available for you to edit.");
     return;
   }
+  if (
+    editingTicket.status === "draft" &&
+    status === "issued" &&
+    !canIssueDraft(editingTicket)
+  ) {
+    setEditError("Only the officer who created this draft can issue it.");
+    return;
+  }
 
   if (savingTicket) return;
 
@@ -325,7 +340,9 @@ if (editingId) {
       notes: details.notes,
       officerId: editingTicket.officerId,
       officerName: editingTicket.officerName,
-      status: editingTicket.status,
+      status: editingTicket.status === "draft"
+        ? status
+        : "issued",
     });
 
     // Replace the existing ticket in React state.
@@ -651,9 +668,11 @@ if (editingId) {
                     letterSpacing: "0.04em",
                   }}
                 >
-                  {editingId
-                    ? "Update your ticket details. Its status and issuing officer will stay unchanged."
-                    : "Complete all required fields before submission."}
+                  {editingTicket?.status === "draft"
+                    ? "Complete your draft and issue the ticket when ready."
+                    : editingId
+                      ? "Update your ticket details."
+                      : "Complete all required fields before submission."}
                 </div>
               </div>
 
@@ -946,7 +965,7 @@ if (editingId) {
                 >
                   {savingTicket
                     ? "Saving..."
-                    : editingId
+                    : editingId && editingTicket?.status !== "draft"
                       ? "Save Changes"
                       : "Issue Ticket"}
                 </button>
@@ -954,7 +973,7 @@ if (editingId) {
                   type="button"
                   disabled={savingTicket}
                   onClick={() => {
-                    if (editingId) {
+                    if (editingId && editingTicket?.status !== "draft") {
                       resetForm();
                       setTab("tickets");
                     } else {
@@ -973,7 +992,11 @@ if (editingId) {
                     cursor: "pointer",
                   }}
                 >
-                  {editingId ? "Cancel" : savingTicket ? "Saving..." : "Save Draft"}
+                {savingTicket
+                  ? "Saving..."
+                  : editingId && editingTicket?.status !== "draft"
+                    ? "Cancel"
+                    : "Save Draft"}
                 </button>
               </div>
             </form>
@@ -1089,13 +1112,30 @@ if (editingId) {
                   tickets={filtered}
                   onSelect={setSelected}
                   actions={(ticket) => canEditTicket(ticket) ? (
-                    <button
-                      type="button"
-                      onClick={() => startEditing(ticket)}
-                      className="font-mono text-xs px-2 py-1 rounded border border-rule bg-white text-ink-mid cursor-pointer"
-                    >
-                      Edit
-                    </button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => startEditing(ticket)}
+                        className="font-mono text-xs px-2 py-1 rounded border border-rule bg-white text-ink-mid cursor-pointer"
+                      >
+                        Edit
+                      </button>
+
+                      {canIssueDraft(ticket) && (
+                        <button
+                          type="button"
+                          onClick={() => startEditing(ticket)}
+                          className="font-mono text-xs px-2 py-1 rounded cursor-pointer"
+                          style={{
+                            border: "1px solid var(--color-primary)",
+                            background: "var(--color-primary-soft)",
+                            color: "var(--color-primary)",
+                          }}
+                        >
+                          Issue
+                        </button>
+                      )}
+                    </div>
                   ) : null}
                 />
               </div>     
@@ -1165,22 +1205,46 @@ if (editingId) {
                         ))}
 
                         {canEditTicket(ticket) && (
-                          <button
-                            type="button"
-                            onClick={() => startEditing(ticket)}
-                            style={{
-                              padding: "12px 16px",
-                              background: "var(--color-primary)",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: 5,
-                              cursor: "pointer",
-                              fontWeight: 600,
-                              marginTop: 8,
-                            }}
-                          >
-                            Edit Ticket
-                          </button>
+                          <div style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginTop: 8,
+                          }}>
+                            <button
+                              type="button"
+                              onClick={() => startEditing(ticket)}
+                              style={{
+                                padding: "12px 16px",
+                                background: "var(--color-primary)",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 5,
+                                cursor: "pointer",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Edit Ticket
+                            </button>
+
+                            {canIssueDraft(ticket) && (
+                              <button
+                                type="button"
+                                onClick={() => startEditing(ticket)}
+                                style={{
+                                  padding: "12px 16px",
+                                  border: "1px solid var(--color-primary)",
+                                  background: "var(--color-primary-soft)",
+                                  color: "var(--color-primary)",
+                                  borderRadius: 5,
+                                  cursor: "pointer",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Issue Ticket
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </details>
