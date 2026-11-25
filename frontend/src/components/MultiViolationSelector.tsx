@@ -1,3 +1,4 @@
+import { useState } from "react";
 
 type ViolationType = {
   id: number;
@@ -16,6 +17,8 @@ export default function MultiViolationSelector({
   selectedViolations,
   onChange,
 }: Props) {
+  const [isOpen, setIsOpen] = useState(false);
+
   const total = violationTypes
     .filter((type) => selectedViolations.includes(type.name))
     .reduce((sum, type) => sum + type.defaultFine, 0);
@@ -47,6 +50,34 @@ export default function MultiViolationSelector({
       >
         SELECT VIOLATIONS *
       </div>
+      
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        disabled={violationTypes.length === 0}
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          border: "1px solid var(--color-rule)",
+          borderRadius: 6,
+          background: "#fff",
+          color: "var(--color-ink)",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: 13,
+        }}
+      >
+        <span>
+          {selectedViolations.length > 0
+            ? `${selectedViolations.length} violation(s) selected`
+            : "Select violations"}
+        </span>
+
+        <span>{isOpen ? "▴" : "▾"}</span>
+      </button>
 
       {violationTypes.length === 0 && (
         <p style={{ fontSize: 12, color: "var(--color-ink-mid)" }}>
@@ -54,7 +85,7 @@ export default function MultiViolationSelector({
         </p>
       )}
 
-      {violationTypes.map((type) => (
+      {isOpen && violationTypes.map((type) => (
         <label
           key={type.id}
           style={{
@@ -96,6 +127,37 @@ export default function MultiViolationSelector({
           </span>
         </label>
       ))}
+
+      {isOpen && (
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          style={{
+            width: "100%",
+            marginTop: 10,
+            padding: 8,
+            border: "1px solid var(--color-rule)",
+            borderRadius: 6,
+            background: "#fff",
+            color: "var(--color-ink)",
+            cursor: "pointer",
+          }}
+        >
+          Done
+        </button>
+      )}
+
+      {selectedViolations.length > 0 && (
+        <div
+          style={{
+            fontSize: 12,
+            marginTop: 10,
+            color: "var(--color-ink-mid)",
+          }}
+        >
+          {selectedViolations.join(", ")}
+        </div>
+      )}
 
       <div
         style={{
