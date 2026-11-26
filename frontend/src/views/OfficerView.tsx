@@ -280,7 +280,62 @@ async function lookupVehicle() {
     setTab("submit")
   }
 
-async function saveTicket(status: "draft" | "issued") {
+  async function issueDraft(ticket: Ticket) {
+    if (!canIssueDraft(ticket) || savingTicket) return;
+
+    if (
+      !ticket.plate.trim() ||
+      !ticket.state.trim() ||
+      !ticket.violation.trim() ||
+      !ticket.location.trim() ||
+      !Number.isFinite(ticket.fine) ||
+      ticket.fine < 0
+    ) {
+      alert("Please edit the draft and complete all required fields before issuing.");
+      return;
+    }
+
+    setSavingTicket(true);
+
+    try {
+      const updatedTicket = await updateTicket(ticket.id, {
+        studentId: ticket.studentId ?? "",
+        violatorName: ticket.violatorName ?? "",
+        licensePlate: ticket.plate,
+        state: ticket.state,
+        vehicleMake: ticket.vehicleMake ?? "",
+        vehicleModel: ticket.vehicleModel ?? "",
+        vehicleColor: ticket.vehicleColor ?? "",
+        violationType: ticket.violation,
+        location: ticket.location,
+        fineAmount: ticket.fine,
+        notes: ticket.notes ?? "",
+        officerId: ticket.officerId,
+        officerName: ticket.officerName,
+        status: "issued",
+      });
+
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === ticket.id ? updatedTicket : t
+        )
+      );
+
+      setSelected(null);
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to issue ticket."
+      );
+    } finally {
+      setSavingTicket(false);
+    }
+  }
+
+  async function saveTicket(status: "draft" | "issued") {
   const details = {
     studentId: form.studentId.trim(),
     violatorName: form.violatorName.trim(),
@@ -1124,7 +1179,8 @@ if (editingId) {
                       {canIssueDraft(ticket) && (
                         <button
                           type="button"
-                          onClick={() => startEditing(ticket)}
+                          onClick={() => issueDraft(ticket)}
+                          disabled={savingTicket}
                           className="font-mono text-xs px-2 py-1 rounded cursor-pointer"
                           style={{
                             border: "1px solid var(--color-primary)",
@@ -1230,7 +1286,8 @@ if (editingId) {
                             {canIssueDraft(ticket) && (
                               <button
                                 type="button"
-                                onClick={() => startEditing(ticket)}
+                                onClick={() => issueDraft(ticket)}
+                                disabled={savingTicket}
                                 style={{
                                   padding: "12px 16px",
                                   border: "1px solid var(--color-primary)",

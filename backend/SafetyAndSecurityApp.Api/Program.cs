@@ -136,25 +136,57 @@ app.MapPost("/api/parkingviolations", async (
             message = "Fine amount cannot be negative."
         });
 
-    // If a violation type was selected, find it in the database.
-    if (!string.IsNullOrWhiteSpace(violation.ViolationType))
-    {
-        var violationType = await db.ViolationTypes
-            .FirstOrDefaultAsync(v => v.Name == violation.ViolationType);
+    // Look up all selected violation types.
+    var selectedNames = violation.ViolationType
+        .Split(';', StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+        .Distinct()
+        .ToList();
 
-        if (violationType == null)
+    // Issued tickets must contain at least one violation.
+    if (violation.Status == "issued" && selectedNames.Count == 0){
+    return Results.BadRequest(new
+    {
+        message = "Violation type is required."
+    });
+    }
+
+    if (selectedNames.Count > 0)
+    {
+        var selectedTypes = await db.ViolationTypes
+            .Where(v => selectedNames.Contains(v.Name))
+            .ToListAsync();
+
+        if (selectedTypes.Count != selectedNames.Count)
+        {
             return Results.BadRequest(new
             {
-                message = "Invalid violation type."
+                message = "One or more violation types are invalid."
             });
+        }
 
-        violation.ViolationTypeId = violationType.Id;
+        // Calculate the combined fine.
+        violation.FineAmount = selectedTypes
+            .Sum(v => v.DefaultFine);
+
+        // Preserve the ID relationship for single violations.
+        violation.ViolationTypeId =
+            selectedTypes.Count == 1
+                ? selectedTypes[0].Id
+                : null;
+
+        // Store all selected violation names.
+        violation.ViolationType =
+            string.Join("; ", selectedNames);
     }
     else
     {
-        // Drafts may not have a violation type selected yet.
+        // Drafts may not have violations selected yet.
         violation.ViolationTypeId = null;
+        violation.ViolationType = string.Empty;
+        violation.FineAmount = 0;
     }
+
 
     // Assign the database ID and timestamp.
     violation.Id = 0;
@@ -188,62 +220,21 @@ app.MapPut("/api/parkingviolations/{id:int}", async (
         });
     }
 
-
-// Determine the current and requested ticket statuses.
-var currentStatus = existingViolation.Status;
-var requestedStatus = updatedViolation.Status;
-
-// Define valid ticket workflow transitions.
-var validTransition = currentStatus switch
-{
-    "draft" => requestedStatus is "draft" or "issued",
-
-    "issued" => requestedStatus is
-        "issued" or "reviewed" or "flagged" or "appealed",
-
-    "reviewed" => requestedStatus is
-        "reviewed" or "submitted" or "flagged" or "appealed",
-
-    "flagged" => requestedStatus is "flagged" or "issued",
-
-    "appealed" => requestedStatus is "appealed" or "issued",
-
-    "submitted" => requestedStatus is "submitted" or "resolved",
-
-    "resolved" => false,
-
-    _ => false
-};
-
-if (!validTransition)
-{
-    return Results.BadRequest(new
-    {
-        message = $"Cannot change ticket status from {currentStatus} to {requestedStatus}."
-    });
-}
-
-
-// Prevent submission before the appeal period expires.
-if (currentStatus == "reviewed" &&
-    requestedStatus == "submitted")
-{
-    var appealDeadline = existingViolation.DateIssued.AddDays(10);
-
-    if (DateTime.UtcNow < appealDeadline)
+// Allow existing tickets to be updated,
+// including tickets submitted to Sells.
+if (existingViolation.Status != "draft" &&
+    existingViolation.Status != "issued" &&
+    existingViolation.Status != "flagged" &&
+    existingViolation.Status != "submitted")
     {
         return Results.BadRequest(new
         {
-            message = "This ticket cannot be submitted until the appeal period has expired.",
-            appealDeadline = appealDeadline
+            message = "This ticket cannot be edited."
         });
     }
-}
 
-
-    // Require complete information whenever a ticket
-    // is no longer being saved as a draft.
-    if (requestedStatus != "draft")
+    // Require complete information unless the ticket remains a draft.
+if (existingViolation.Status != "draft" || updatedViolation.Status != "draft")
     {
         if (string.IsNullOrWhiteSpace(updatedViolation.LicensePlate))
             return Results.BadRequest(new
@@ -279,25 +270,43 @@ if (currentStatus == "reviewed" &&
     }
 
     // Look up the selected violation type.
-    if (!string.IsNullOrWhiteSpace(updatedViolation.ViolationType))
-    {
-        var violationType = await db.ViolationTypes
-            .FirstOrDefaultAsync(v =>
-                v.Name == updatedViolation.ViolationType);
+    var selectedNames = updatedViolation.ViolationType
+        .Split(';', StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+        .Distinct()
+        .ToList();
 
-        if (violationType == null)
+    if (selectedNames.Count > 0)
+    {
+        var selectedTypes = await db.ViolationTypes
+            .Where(v => selectedNames.Contains(v.Name))
+            .ToListAsync();
+
+        if (selectedTypes.Count != selectedNames.Count)
         {
             return Results.BadRequest(new
             {
-                message = "Invalid violation type."
+                message = "One or more violation types are invalid."
             });
         }
 
-        existingViolation.ViolationTypeId = violationType.Id;
+        // Calculate the combined fine.
+        updatedViolation.FineAmount = selectedTypes
+            .Sum(v => v.DefaultFine);
+
+        // Preserve the existing ID relationship for single violations.
+        existingViolation.ViolationTypeId =
+            selectedTypes.Count == 1
+                ? selectedTypes[0].Id
+                : null;
+
+        updatedViolation.ViolationType =
+            string.Join("; ", selectedNames);
     }
     else
     {
         existingViolation.ViolationTypeId = null;
+        updatedViolation.FineAmount = 0;
     }
 
     // Update the ticket's editable fields.
@@ -313,23 +322,37 @@ if (currentStatus == "reviewed" &&
     existingViolation.FineAmount = updatedViolation.FineAmount;
     existingViolation.Notes = updatedViolation.Notes;
 
-    
-    // Start the appeal period when a draft is officially issued.
-    if (currentStatus == "draft" &&
-        requestedStatus == "issued")
+    // Validate the requested status.
+    var allowedStatuses = new[]
     {
-        existingViolation.DateIssued = DateTime.UtcNow;
+        "draft",
+        "issued",
+        "flagged",
+        "appealed",
+        "submitted",
+        "resolved"
+    };
+
+    if (!allowedStatuses.Contains(updatedViolation.Status))
+    {
+        return Results.BadRequest(new
+        {
+            message = "Invalid ticket status."
+        });
+    }
+
+    // Set the actual issuance date when issuing a draft.
+    if (existingViolation.Status == "draft" && updatedViolation.Status == "issued"){
+         existingViolation.DateIssued = DateTime.UtcNow;
     }
 
     // Update the ticket status.
-    existingViolation.Status = requestedStatus;
+    existingViolation.Status = updatedViolation.Status;
 
-    // Save the changes while preserving the original
-    // ticket ID and officer information.
+    // Preserve the original ticket ID and officer.
     await db.SaveChangesAsync();
 
     return Results.Ok(existingViolation);
-
 });
 
 
