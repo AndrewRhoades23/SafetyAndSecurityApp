@@ -121,10 +121,75 @@ const inputStyle: React.CSSProperties = {
 const STATUSES: TicketStatus[] = [
   "draft",
   "issued",
+  "reviewed",
   "submitted",
   "flagged",
   "appealed",
 ]
+
+const ADMIN_ID = "ADM-001";
+
+const APPEAL_PERIOD_DAYS = 10;
+
+const APPEAL_PERIOD_MS =
+  APPEAL_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+
+function getAppealDeadline(ticket: Ticket): number {
+  const issuedAt = ticket.issuedAt;
+
+  const utcDate = /(?:Z|[+-]\d{2}:\d{2})$/i.test(issuedAt)
+    ? issuedAt
+    : `${issuedAt}Z`;
+
+  return new Date(utcDate).getTime() + APPEAL_PERIOD_MS;
+}
+
+function canSubmitToSells(
+  ticket: Ticket,
+  now: number = Date.now()
+): boolean {
+  return (
+    ticket.status === "reviewed" &&
+    now >= getAppealDeadline(ticket)
+  );
+}
+
+function getAppealTimeRemaining(
+  ticket: Ticket,
+  now: number
+): string {
+  const remaining = getAppealDeadline(ticket) - now;
+
+  if (!Number.isFinite(remaining)) {
+    return "Invalid issuance date";
+  }
+
+  if (remaining <= 0) {
+    return "Appeal period expired";
+  }
+
+  const totalMinutes = Math.ceil(remaining / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${days}d ${hours}h ${minutes}m remaining`;
+}
+
+function canIssueDraft(ticket: Ticket) {
+  return (
+    ticket.status === "draft" &&
+    ticket.createdById === ADMIN_ID
+  );
+}
+
+function canEditTicket(ticket: Ticket) {
+  if (ticket.status === "draft") {
+    return ticket.createdById === ADMIN_ID;
+  }
+
+  return ["issued", "flagged", "submitted"].includes(ticket.status);
+}
 
 const OFFICERS = [
   { id: "OFF-003", name: "J. Martinez" },
@@ -141,6 +206,7 @@ export default function AdminView({ tickets, setTickets }: {
   const [violationTypesError, setViolationTypesError] = useState("");
   const [tab, setTab] = useState<Tab>("all")
   const [savingTicket, setSavingTicket] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [selectedViolations, setSelectedViolations] = useState<string[]>([]);
   const [saveError, setSaveError] = useState("");
   const [search, setSearch] = useState("")
@@ -171,6 +237,14 @@ export default function AdminView({ tickets, setTickets }: {
     notes: "",
     officerId: "ADM-001",
   })
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
   async function loadViolationTypes() {
@@ -224,7 +298,7 @@ async function saveTicket(status: "draft" | "issued") {
       vehicleMake: form.make.trim(),
       vehicleModel: form.model.trim(),
       vehicleColor: form.color.trim(),
-      violationType: form.violation,
+      violationType: selectedViolations.join("; "),
       location: form.location.trim(),
       fineAmount: Number(form.fine),
       notes: buildTicketNotes(
@@ -234,6 +308,7 @@ async function saveTicket(status: "draft" | "issued") {
       ),
       officerId: officer.id,
       officerName: officer.name,
+      createdById: ADMIN_ID,
       status,
     });
 
@@ -362,10 +437,73 @@ function fillVehicleDetails(vehicle: Vehicle) {
     (t) => t.status === "issued"
   );
 
+  async function reviewTicket(t: Ticket) {
+    const currentTicket = tickets.find(
+      (ticket) => ticket.id === t.id
+    );
+
+    if (
+      !currentTicket ||
+      currentTicket.status !== "issued" ||
+      savingTicket
+    ) {
+      return;
+    }
+
+    setSavingTicket(true);
+    setSaveError("");
+
+    try {
+      const updatedTicket = await updateTicket(currentTicket.id, {
+        studentId: currentTicket.studentId ?? "",
+        violatorName: currentTicket.violatorName ?? "",
+        licensePlate: currentTicket.plate,
+        state: currentTicket.state,
+        vehicleMake: currentTicket.vehicleMake ?? "",
+        vehicleModel: currentTicket.vehicleModel ?? "",
+        vehicleColor: currentTicket.vehicleColor ?? "",
+        violationType: currentTicket.violation,
+        location: currentTicket.location,
+        fineAmount: currentTicket.fine,
+        notes: currentTicket.notes ?? "",
+        officerId: currentTicket.officerId,
+        officerName: currentTicket.officerName,
+        status: "reviewed",
+      });
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === currentTicket.id
+            ? updatedTicket
+            : ticket
+        )
+      );
+    } catch (error) {
+      console.error("Failed to review ticket:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to review ticket.";
+
+      setSaveError(message);
+      alert(message);
+    } finally {
+      setSavingTicket(false);
+    }
+  }
+
   async function submitToSells(t: Ticket) {
     const currentTicket = tickets.find((x) => x.id === t.id);
 
-    if (!currentTicket || currentTicket.status !== "issued" || savingTicket) {
+    if (!currentTicket || savingTicket) {
+      return;
+    }
+
+    if (!canSubmitToSells(currentTicket)) {
+      setSaveError(
+        "Only reviewed tickets with an expired appeal period can be submitted."
+      );
       return;
     }
 
@@ -374,19 +512,19 @@ function fillVehicleDetails(vehicle: Vehicle) {
 
     try {
       const updatedTicket = await updateTicket(t.id, {
-        studentId: t.studentId ?? "",
-        violatorName: t.violatorName ?? "",
-        licensePlate: t.plate,
-        state: t.state,
-        vehicleMake: t.vehicleMake ?? "",
-        vehicleModel: t.vehicleModel ??"",
-        vehicleColor: t.vehicleColor ?? "",
-        violationType: t.violation,
-        location: t.location,
-        fineAmount: t.fine,
-        notes: t.notes ?? "",
-        officerId: t.officerId,
-        officerName: t.officerName,
+        studentId: currentTicket.studentId ?? "",
+        violatorName: currentTicket.violatorName ?? "",
+        licensePlate: currentTicket.plate,
+        state: currentTicket.state,
+        vehicleMake: currentTicket.vehicleMake ?? "",
+        vehicleModel: currentTicket.vehicleModel ??"",
+        vehicleColor: currentTicket.vehicleColor ?? "",
+        violationType: currentTicket.violation,
+        location: currentTicket.location,
+        fineAmount: currentTicket.fine,
+        notes: currentTicket.notes ?? "",
+        officerId: currentTicket.officerId,
+        officerName: currentTicket.officerName,
         status: "submitted",
       });
 
@@ -415,6 +553,9 @@ function fillVehicleDetails(vehicle: Vehicle) {
 
     setSavingTicket(true);
     setSaveError("");
+
+    console.log("Ticket being flagged:", t);
+    console.log("Violation being sent:", t.violation);
 
     try {
       const updatedTicket = await updateTicket(t.id, {
@@ -507,8 +648,12 @@ function fillVehicleDetails(vehicle: Vehicle) {
   }
 
 
-  function openEditTicket(ticket: Ticket) {
-    const restored = readTicketNotes(
+function openEditTicket(ticket: Ticket) {
+  if (!canEditTicket(ticket)) return;
+
+  setSaveError("");
+
+  const restored = readTicketNotes(
       ticket.notes ?? "",
       ticket.violation
     );
@@ -519,13 +664,37 @@ function fillVehicleDetails(vehicle: Vehicle) {
   }
 
 
-  async function saveChanges(t: Ticket) {
-    if (savingTicket) return;
+  async function saveChanges(
+  t: Ticket,
+  requestedStatus: TicketStatus = t.status
+) {
+  if (savingTicket) return;
 
-    if (editSelectedViolations.length === 0 && t.status !== "draft") {
-      setSaveError("Please select at least one violation.");
-      return;
-    }
+  const currentTicket = tickets.find(
+    (ticket) => ticket.id === t.id
+  );
+
+  if (!currentTicket || !canEditTicket(currentTicket)) {
+    setSaveError("You do not have permission to edit this ticket.");
+    return;
+  }
+
+  if (
+    currentTicket.status === "draft" &&
+    requestedStatus === "issued" &&
+    !canIssueDraft(currentTicket)
+  ) {
+    setSaveError("Only the original creator can issue this draft.");
+    return;
+  }
+
+  if (
+    editSelectedViolations.length === 0 &&
+    requestedStatus !== "draft"
+  ) {
+    setSaveError("Please select at least one violation.");
+    return;
+  }
 
     setSavingTicket(true);
     setSaveError("");
@@ -539,7 +708,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
         vehicleMake: t.vehicleMake ?? "",
         vehicleModel: t.vehicleModel ?? "",
         vehicleColor: t.vehicleColor ?? "",
-        violationType: t.violation,
+        violationType: editSelectedViolations.join("; "),
         location: t.location,
         fineAmount: t.fine,
         notes: buildTicketNotes(
@@ -549,7 +718,7 @@ function fillVehicleDetails(vehicle: Vehicle) {
         ),
         officerId: t.officerId,
         officerName: t.officerName,
-        status: t.status,
+        status: requestedStatus,
       });
 
       setTickets((prev) =>
@@ -701,6 +870,12 @@ function fillVehicleDetails(vehicle: Vehicle) {
                   tickets.filter((t) => t.status === "submitted").length,
                 ],
                 ["Pending Review", pending.length],
+                [
+                  "Reviewed",
+                  activeTickets.filter((ticket) =>
+                    ticket.status === "reviewed"
+                  ).length,
+                ],
                 ["Flagged", activeTickets.filter((ticket) => ticket.status === "flagged").length],
               ].map(([label, val]) => (
                 <div
@@ -1220,24 +1395,40 @@ function fillVehicleDetails(vehicle: Vehicle) {
                   onSelect={openEditTicket}
                   actions={(t) => (
                     <div className="inline-grid w-max grid-flow-col auto-cols-max gap-1.5 whitespace-nowrap">
-                      <button
-                        className="col-start-1 row-start-1"
-                        onClick={() => openEditTicket(t)}
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 10,
-                          padding: "3px 8px",
-                          borderRadius: 3,
-                          border: "1px solid var(--color-rule)",
-                          background: "#fff",
-                          color: "var(--color-ink-mid)",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Edit
-                      </button>                   
-                      {t.status !== "appealed" && (
+                      {canEditTicket(t) && (
                         <button
+                          className="col-start-1 row-start-1"
+                          onClick={() => openEditTicket(t)}
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            padding: "3px 8px",
+                            borderRadius: 3,
+                            border: "1px solid var(--color-rule)",
+                            background: "#fff",
+                            color: "var(--color-ink-mid)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Edit
+                        </button>  
+                      )} 
+                      {canIssueDraft(t) && (
+                        <button
+                          type="button"
+                          className="col-start-2 row-start-1 font-mono text-xs px-2 py-1 rounded cursor-pointer"
+                          onClick={() => openEditTicket(t)}
+                          disabled={savingTicket}
+                          style={{
+                            border: "1px solid var(--color-primary)",
+                            background: "var(--color-primary-soft)",
+                            color: "var(--color-primary)",
+                          }}
+                        >
+                          Issue
+                        </button>
+                      )}                
+                      {t.status !== "draft" && t.status !== "appealed" && (                        <button
                           type="button"
                           onClick={() =>
                             setTickets((prev) =>
@@ -1259,7 +1450,8 @@ function fillVehicleDetails(vehicle: Vehicle) {
                         </button>
                       )}
 
-                      {t.status !== "flagged" && t.status !== "resolved" && (
+                      {(t.status === "issued" ||
+                        t.status === "reviewed") && (
                         <button
                           className="col-start-1 row-start-2"
                           onClick={() => {
@@ -1302,8 +1494,35 @@ function fillVehicleDetails(vehicle: Vehicle) {
                       )}
                       {t.status === "issued" && (
                         <button
+                          type="button"
                           className="col-start-2 row-start-2"
-                          onClick={() => setReviewing(t)}
+                          onClick={() => reviewTicket(t)}
+                          disabled={savingTicket}
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            padding: "3px 8px",
+                            borderRadius: 3,
+                            border: "1px solid var(--color-status-reviewed)",
+                            background: "var(--color-status-reviewed-soft)",
+                            color: "var(--color-status-reviewed)",
+                            cursor: savingTicket ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          Review
+                        </button>
+                      )}
+                      {t.status === "reviewed" && (
+                      <>
+                        <button
+                          type="button"
+                          className="col-start-2 row-start-2"
+                          onClick={() => {
+                            setSaveError("");
+                            setReviewing(t);
+                          }}
+                          disabled={savingTicket || !canSubmitToSells(t, now)}
+                          title={getAppealTimeRemaining(t, now)}
                           style={{
                             fontFamily: "var(--font-mono)",
                             fontSize: 10,
@@ -1312,12 +1531,29 @@ function fillVehicleDetails(vehicle: Vehicle) {
                             border: "1px solid var(--color-status-submitted)",
                             background: "var(--color-status-submitted-soft)",
                             color: "var(--color-status-submitted)",
-                            cursor: "pointer",
+                            opacity: canSubmitToSells(t, now) ? 1 : 0.5,
+                            cursor:
+                              savingTicket || !canSubmitToSells(t, now)
+                                ? "not-allowed"
+                                : "pointer",
                           }}
                         >
                           Submit
                         </button>
-                      )}
+
+                        <span
+                          className="col-span-2 row-start-3"
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            color: "var(--color-ink-mid)",
+                            textAlign: "center",
+                          }}
+                        >
+                          {getAppealTimeRemaining(t, now)}
+                        </span>
+                      </>
+                    )}
                     </div>
                   )}
                 />
@@ -1365,14 +1601,31 @@ function fillVehicleDetails(vehicle: Vehicle) {
                           ))}
 
                           <div className="admin-mobile-ticket-actions">
-                            <button
-                              type="button"
-                              onClick={() => openEditTicket(ticket)}
-                            >
-                              Edit
-                            </button>
+                            {canEditTicket(ticket) && (
+                              <button
+                                type="button"
+                                onClick={() => openEditTicket(ticket)}
+                              >
+                                Edit
+                              </button>
+                            )}
 
-                            {ticket.status !== "appealed" && (
+                            {canIssueDraft(ticket) && (
+                              <button
+                                type="button"
+                                onClick={() => openEditTicket(ticket)}
+                                disabled={savingTicket}
+                                style={{
+                                  border: "1px solid var(--color-primary)",
+                                  background: "var(--color-primary-soft)",
+                                  color: "var(--color-primary)",
+                                }}
+                              >
+                                Issue
+                              </button>
+                            )}
+
+                            {ticket.status !== "draft" && ticket.status !== "appealed" && (
                               <button
                                 className="col-start-2 row-start-1 font-mono text-xs px-2 py-1 rounded cursor-pointer"
                                 type="button"
@@ -1395,8 +1648,8 @@ function fillVehicleDetails(vehicle: Vehicle) {
                               </button>
                             )}
 
-                            {ticket.status !== "flagged" &&
-                              ticket.status !== "resolved" && (
+                            {(ticket.status === "issued" ||
+                              ticket.status === "reviewed") && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1421,11 +1674,55 @@ function fillVehicleDetails(vehicle: Vehicle) {
                             {ticket.status === "issued" && (
                               <button
                                 type="button"
-                                onClick={() => setReviewing(ticket)}
+                                onClick={() => reviewTicket(ticket)}
+                                disabled={savingTicket}
+                                style={{
+                                  border: "1px solid var(--color-status-reviewed)",
+                                  background: "var(--color-status-reviewed-soft)",
+                                  color: "var(--color-status-reviewed)",
+                                  cursor: savingTicket ? "not-allowed" : "pointer",
+                                }}
+                              >
+                                Review
+                              </button>
+                            )}
+                            {ticket.status === "reviewed" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSaveError("");
+                                  setReviewing(ticket);
+                                }}
+                                disabled={
+                                  savingTicket || !canSubmitToSells(ticket, now)
+                                }
+                                style={{
+                                  border: "1px solid var(--color-status-submitted)",
+                                  background: "var(--color-status-submitted-soft)",
+                                  color: "var(--color-status-submitted)",
+                                  opacity: canSubmitToSells(ticket, now) ? 1 : 0.5,
+                                  cursor:
+                                    savingTicket || !canSubmitToSells(ticket, now)
+                                      ? "not-allowed"
+                                      : "pointer",
+                                }}
                               >
                                 Submit to Sells
                               </button>
-                            )}
+
+                              <div
+                                style={{
+                                  width: "100%",
+                                  fontSize: 11,
+                                  fontFamily: "var(--font-mono)",
+                                  color: "var(--color-ink-mid)",
+                                }}
+                              >
+                                {getAppealTimeRemaining(ticket, now)}
+                              </div>
+                            </>
+                          )}
                           </div>
                         </div>
                       </details>
@@ -1556,14 +1853,20 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 onChange={(e) => setEditing({ ...editing, location: e.target.value })} style={inputStyle} />
             </Field>
             <Field label="STATUS">
-              <select value={editing.status}
-                onChange={(e) => setEditing({ ...editing, status: e.target.value as TicketStatus })} style={inputStyle}>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
+              <input
+                value={
+                  editing.status === "issued"
+                    ? "Pending Review"
+                    : editing.status.charAt(0).toUpperCase() +
+                      editing.status.slice(1)
+                }
+                readOnly
+                style={{
+                  ...inputStyle,
+                  background: "#f3f4f6",
+                  cursor: "default",
+                }}
+              />
             </Field>
           </div>
           <Field label="NOTES">
@@ -1612,13 +1915,38 @@ function fillVehicleDetails(vehicle: Vehicle) {
                 cursor: "pointer",
               }}
             >
-              {savingTicket ? "Saving..." : "Save Changes"}
-              {saveError && (
+              {savingTicket
+                ? "Saving..."
+                : editing.status === "draft"
+                  ? "Save Draft"
+                  : "Save Changes"
+                }              
+                {saveError && (
                 <p role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
                   {saveError}
                 </p>
               )}
             </button>
+            {canIssueDraft(editing) && (
+              <button
+                type="button"
+                onClick={() => saveChanges(editing, "issued")}
+                disabled={savingTicket}
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  padding: "9px 20px",
+                  borderRadius: 5,
+                  border: "none",
+                  background: "var(--color-primary)",
+                  color: "#fff",
+                  cursor: savingTicket ? "not-allowed" : "pointer",
+                }}
+              >
+                {savingTicket ? "Issuing..." : "Issue Ticket"}
+              </button>
+            )}
           </div>
         </Modal>
       )}
@@ -1649,8 +1977,9 @@ function fillVehicleDetails(vehicle: Vehicle) {
               lineHeight: 1.6,
             }}
           >
+            The 10-day appeal period has expired.
             Please verify the ticket information below before continuing.
-            Confirming will move this ticket from Pending Review to the
+            Confirming will move this ticket from Reviewed to the
             Sells processing queue.
           </p>
           <div
@@ -1713,7 +2042,14 @@ function fillVehicleDetails(vehicle: Vehicle) {
             </button>
             <button
               onClick={() => submitToSells(reviewing)}
-              disabled={savingTicket}
+              disabled={
+                savingTicket ||
+                !tickets.some(
+                  (ticket) =>
+                    ticket.id === reviewing.id &&
+                    canSubmitToSells(ticket, now)
+                )
+              }
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 600,

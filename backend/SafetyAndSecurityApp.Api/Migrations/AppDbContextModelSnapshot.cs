@@ -23,6 +23,10 @@ namespace SafetyAndSecurityApp.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CreatedById")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("DateIssued")
                         .HasColumnType("TEXT");
 

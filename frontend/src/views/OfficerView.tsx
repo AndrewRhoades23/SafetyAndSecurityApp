@@ -99,13 +99,19 @@ const OFFICER_ID = "OFF-003"
 function canIssueDraft(ticket: Ticket) {
   return (
     ticket.status === "draft" &&
-    ticket.officerId === OFFICER_ID
+    ticket.createdById === OFFICER_ID
   )
 }
 
 function canEditTicket(ticket: Ticket) {
-  return ticket.officerId === OFFICER_ID &&
-    ["draft", "issued", "flagged"].includes(ticket.status)
+  if (ticket.status === "draft") {
+    return ticket.createdById === OFFICER_ID;
+  }
+
+  return (
+    ticket.officerId === OFFICER_ID &&
+    ["issued", "flagged"].includes(ticket.status)
+  );
 }
 
 export default function OfficerView({ tickets, setTickets }: {
@@ -447,6 +453,7 @@ if (editingId) {
       notes: details.notes,
       officerId: OFFICER_ID,
       officerName: "J. Martinez",
+      createdById: OFFICER_ID,
       status,
     });
 

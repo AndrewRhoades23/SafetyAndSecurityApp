@@ -28,9 +28,12 @@ public class ParkingViolation
     public DateTime DateIssued { get; set; } = DateTime.UtcNow;
     public string Notes { get; set; } = string.Empty;
 
-    // Officer information
-    public string OfficerId { get; set; } = string.Empty;
-    public string OfficerName { get; set; } = string.Empty;
+// Officer information
+public string OfficerId { get; set; } = string.Empty;
+public string OfficerName { get; set; } = string.Empty;
+
+// Original ticket creator
+public string CreatedById { get; set; } = string.Empty;
 
     // Ticket workflow
     public string Status { get; set; } = "issued";

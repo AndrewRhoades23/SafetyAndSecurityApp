@@ -20,6 +20,7 @@ interface ParkingViolationResponse {
   notes: string;
   officerId: string;
   officerName: string;
+  createdById: string;
   status: string;
 }
 
@@ -37,11 +38,12 @@ export interface CreateTicketRequest {
   notes: string;
   officerId: string;
   officerName: string;
+  createdById: string;
   status: "draft" | "issued";
 }
 
 export interface UpdateTicketRequest
-  extends Omit<CreateTicketRequest, "status"> {
+  extends Omit<CreateTicketRequest, "status" | "createdById"> {
   status: TicketStatus;
 }
 
@@ -58,6 +60,7 @@ function mapTicket(violation: ParkingViolationResponse): Ticket {
     issuedAt: violation.dateIssued,
     officerId: violation.officerId,
     officerName: violation.officerName,
+    createdById: violation.createdById,
     status: violation.status as TicketStatus,
     notes: violation.notes,
     vehicleMake: violation.vehicleMake,

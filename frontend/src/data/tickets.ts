@@ -6,7 +6,7 @@ export type TicketStatus =
   | "flagged"
   | "appealed"
   | "resolved"
-  
+
 export interface Ticket {
   id: string
   plate: string
@@ -18,6 +18,7 @@ export interface Ticket {
   fine: number
   issuedAt: string // ISO
   officerId: string
+  createdById?: string
   officerName: string
   status: TicketStatus
   notes?: string
